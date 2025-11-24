@@ -63,8 +63,36 @@ export class EvaluationService {
   constructor(private sp: SPFI) {}
 
   public async getCurrentUser(): Promise<IUserInfo> {
-    const u = await this.sp.web.currentUser();
-    return { Id: u.Id, Email: u.Email, Title: u.Title };
+    // Retry logic with exponential backoff for SharePoint context initialization
+    const maxRetries = 3;
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const u = await this.sp.web.currentUser();
+
+        // Validate the user object has required properties
+        if (u && typeof u.Id === 'number' && u.Email) {
+          return { Id: u.Id, Email: u.Email, Title: u.Title };
+        }
+
+        // User object is incomplete, retry after a delay
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 250));
+        }
+      } catch (error) {
+        lastError = error as Error;
+        // Wait before retrying
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 250));
+        }
+      }
+    }
+
+    throw new Error(
+      'Unable to load current user information. Please refresh the page. ' +
+      (lastError ? `Details: ${lastError.message}` : '')
+    );
   }
 
   public async getAssignment(id: number): Promise<IAssignment> {
