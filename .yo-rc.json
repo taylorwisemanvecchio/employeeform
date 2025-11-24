@@ -1,0 +1,18 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "20.11.1",
+    "sdksVersions": {},
+    "version": "1.21.1",
+    "libraryName": "employee-eval",
+    "libraryId": "7644dc53-0f68-4316-93c9-d1204add4c1c",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionName": "employee-eval",
+    "solutionShortDescription": "employee-eval description",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}

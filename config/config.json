@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "employee-evak-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/employeeEvak/EmployeeEvakWebPart.js",
+          "manifest": "./src/webparts/employeeEvak/EmployeeEvakWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "EmployeeEvakWebPartStrings": "lib/webparts/employeeEvak/loc/{locale}.js"
+  }
+}

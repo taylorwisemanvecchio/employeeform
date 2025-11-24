@@ -1,0 +1,286 @@
+import { SPFI } from "@pnp/sp";
+import "@pnp/sp/items";
+import "@pnp/sp/lists";
+import "@pnp/sp/site-users/web";
+
+export type ReviewerType = "Employee" | "Supervisor" | "Reviewer";
+
+export interface IUserInfo {
+  Id: number;
+  Email: string;
+  Title?: string;
+}
+
+export interface IAssignment {
+  Id: number;
+  Title: string;
+  ReviewPeriodStart?: string;
+  ReviewPeriodEnd?: string;
+  Status?: string;
+
+  SelfEvalSubmitted?: boolean;
+  SupervisorSubmitted?: boolean;
+  ReviewerSubmitted?: boolean;
+
+  Employee?: IUserInfo;
+  Supervisor?: IUserInfo;
+  OptionalReviewer?: IUserInfo;
+}
+
+export interface IEvaluationResponse extends Record<string, unknown> {
+  Id: number;
+  Title?: string;
+  AssignmentIDId: number;
+  ReviewerType: ReviewerType;
+  SubmittedDate?: string;
+}
+
+export interface IPendingAssignment extends IAssignment {
+  MyRole: ReviewerType;
+}
+
+// Internal raw SharePoint shape for assignments
+interface IRawAssignment {
+  Id: number;
+  Title: string;
+  ReviewPeriodStart?: string;
+  ReviewPeriodEnd?: string;
+  Status?: string;
+
+  SelfEvalSubmitted?: boolean;
+  SupervisorSubmitted?: boolean;
+  ReviewerSubmitted?: boolean;
+
+  Employee?: { Id: number; EMail?: string; Title?: string };
+  Supervisor?: { Id: number; EMail?: string; Title?: string };
+  OptionalReviewer?: { Id: number; EMail?: string; Title?: string };
+}
+
+export class EvaluationService {
+  private assignmentsList = "EvaluationAssignments";
+  private responsesList = "EvaluationResponses";
+
+  constructor(private sp: SPFI) {}
+
+  public async getCurrentUser(): Promise<IUserInfo> {
+    const u = await this.sp.web.currentUser();
+    return { Id: u.Id, Email: u.Email, Title: u.Title };
+  }
+
+  public async getAssignment(id: number): Promise<IAssignment> {
+    const a = await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.getById(id)
+      .select(
+        "Id,Title,ReviewPeriodStart,ReviewPeriodEnd,Status," +
+          "SelfEvalSubmitted,SupervisorSubmitted,ReviewerSubmitted," +
+          "Employee/Id,Employee/Title,Employee/EMail," +
+          "Supervisor/Id,Supervisor/Title,Supervisor/EMail," +
+          "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail"
+      )
+      .expand("Employee,Supervisor,OptionalReviewer")();
+
+    const raw = a as unknown as IRawAssignment;
+
+    const mapUser = (
+      p?: { Id: number; EMail?: string; Title?: string }
+    ): IUserInfo | undefined =>
+      p && p.EMail ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+
+    return {
+      Id: raw.Id,
+      Title: raw.Title,
+      ReviewPeriodStart: raw.ReviewPeriodStart,
+      ReviewPeriodEnd: raw.ReviewPeriodEnd,
+      Status: raw.Status,
+      SelfEvalSubmitted: raw.SelfEvalSubmitted,
+      SupervisorSubmitted: raw.SupervisorSubmitted,
+      ReviewerSubmitted: raw.ReviewerSubmitted,
+      Employee: mapUser(raw.Employee),
+      Supervisor: mapUser(raw.Supervisor),
+      OptionalReviewer: mapUser(raw.OptionalReviewer)
+    };
+  }
+
+  /**
+   * Broad pending fetch:
+   * - include items assigned to me in any role
+   * - exclude clearly completed/archived items
+   * - allow blank Status
+   * - fallback to client-side email match if server filter returns none
+   */
+  public async getPendingAssignmentsForUser(): Promise<IPendingAssignment[]> {
+    const me = await this.getCurrentUser();
+    const emailLower = me.Email.replace("'", "''").toLowerCase();
+
+    const filter =
+      "(" +
+        "Employee/EMail eq '" + emailLower + "' or " +
+        "Supervisor/EMail eq '" + emailLower + "' or " +
+        "OptionalReviewer/EMail eq '" + emailLower + "'" +
+      ")" +
+      " and (" +
+        "Status ne 'Complete' and Status ne 'Completed' and Status ne 'Closed' and Status ne 'Archived' " +
+        "or Status eq null" +
+      ")";
+
+    const selectExpand =
+      "Id,Title,ReviewPeriodStart,ReviewPeriodEnd,Status," +
+      "SelfEvalSubmitted,SupervisorSubmitted,ReviewerSubmitted," +
+      "Employee/Id,Employee/Title,Employee/EMail," +
+      "Supervisor/Id,Supervisor/Title,Supervisor/EMail," +
+      "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail";
+
+    let items = await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.filter(filter)
+      .select(selectExpand)
+      .expand("Employee,Supervisor,OptionalReviewer")();
+
+    // Fallback if server filter returns nothing
+    if (!items || items.length === 0) {
+      const base = await this.sp.web.lists
+        .getByTitle(this.assignmentsList)
+        .items.top(200)();
+
+      const ids = (base as Array<{ Id: number }>).map((b) => b.Id);
+
+      items = await Promise.all(
+        ids.map((id: number) =>
+          this.sp.web.lists
+            .getByTitle(this.assignmentsList)
+            .items.getById(id)
+            .select(selectExpand)
+            .expand("Employee,Supervisor,OptionalReviewer")()
+        )
+      );
+    }
+
+    const rawItems = items as unknown as IRawAssignment[];
+
+    const normalizeUser = (
+      p?: { Id: number; EMail?: string; Title?: string }
+    ): IUserInfo | undefined =>
+      p && p.EMail ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+
+    const meLower = me.Email.toLowerCase();
+    const doneStatuses = ["complete", "completed", "closed", "archived"];
+
+    return rawItems
+      .filter((it: IRawAssignment) => {
+        const e = it.Employee && it.Employee.EMail ? it.Employee.EMail.toLowerCase() : undefined;
+        const s = it.Supervisor && it.Supervisor.EMail ? it.Supervisor.EMail.toLowerCase() : undefined;
+        const r =
+          it.OptionalReviewer && it.OptionalReviewer.EMail
+            ? it.OptionalReviewer.EMail.toLowerCase()
+            : undefined;
+        return e === meLower || s === meLower || r === meLower;
+      })
+      .filter((it: IRawAssignment) => {
+        const st = (it.Status || "").toLowerCase();
+        return doneStatuses.indexOf(st) === -1; // ES5-safe
+      })
+      .map((it: IRawAssignment): IPendingAssignment => {
+        let role: ReviewerType = "Reviewer";
+        if (it.Employee && it.Employee.EMail && it.Employee.EMail.toLowerCase() === meLower) {
+          role = "Employee";
+        } else if (
+          it.Supervisor &&
+          it.Supervisor.EMail &&
+          it.Supervisor.EMail.toLowerCase() === meLower
+        ) {
+          role = "Supervisor";
+        } else {
+          role = "Reviewer";
+        }
+
+        return {
+          Id: it.Id,
+          Title: it.Title,
+          ReviewPeriodStart: it.ReviewPeriodStart,
+          ReviewPeriodEnd: it.ReviewPeriodEnd,
+          Status: it.Status,
+          SelfEvalSubmitted: it.SelfEvalSubmitted,
+          SupervisorSubmitted: it.SupervisorSubmitted,
+          ReviewerSubmitted: it.ReviewerSubmitted,
+          Employee: normalizeUser(it.Employee),
+          Supervisor: normalizeUser(it.Supervisor),
+          OptionalReviewer: normalizeUser(it.OptionalReviewer),
+          MyRole: role
+        };
+      });
+  }
+
+  public async getMyResponse(
+    assignmentId: number,
+    reviewerType: ReviewerType,
+    userEmail: string
+  ): Promise<IEvaluationResponse | undefined> {
+    const email = userEmail.replace("'", "''");
+    const items = await this.sp.web.lists
+      .getByTitle(this.responsesList)
+      .items.filter(
+        "AssignmentIDId eq " +
+          assignmentId +
+          " and ReviewerType eq '" +
+          reviewerType +
+          "' and ReviewerName/EMail eq '" +
+          email +
+          "'"
+      )
+      .select("Id,Title,SubmittedDate,AssignmentIDId,ReviewerType,* ,ReviewerName/EMail")
+      .expand("ReviewerName")();
+
+    if (!items || items.length === 0) return undefined;
+    return items[0] as unknown as IEvaluationResponse;
+  }
+
+  // Safe create: add then re-read
+  public async createResponse(
+    payload: Record<string, unknown>
+  ): Promise<IEvaluationResponse> {
+    const addRes = await this.sp.web.lists
+      .getByTitle(this.responsesList)
+      .items.add(payload);
+
+    const createdId = addRes.data.Id as number | undefined;
+
+    if (!createdId) {
+      const full = await addRes.item.select("Id,*")();
+      return full as unknown as IEvaluationResponse;
+    }
+
+    const fullItem = await this.sp.web.lists
+      .getByTitle(this.responsesList)
+      .items.getById(createdId)
+      .select("Id,*")();
+
+    return fullItem as unknown as IEvaluationResponse;
+  }
+
+  public async updateResponse(
+    id: number,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    await this.sp.web.lists
+      .getByTitle(this.responsesList)
+      .items.getById(id)
+      .update(payload);
+  }
+
+  public async markSubmitted(
+    assignmentId: number,
+    role: ReviewerType
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {};
+
+    if (role === "Employee") payload.SelfEvalSubmitted = true;
+    if (role === "Supervisor") payload.SupervisorSubmitted = true;
+    if (role === "Reviewer") payload.ReviewerSubmitted = true;
+
+    await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.getById(assignmentId)
+      .update(payload);
+  }
+}
