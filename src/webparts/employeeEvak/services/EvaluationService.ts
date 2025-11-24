@@ -291,7 +291,7 @@ export class EvaluationService {
         try {
           const itemData = await addRes.item.select("Id")();
           createdId = itemData?.Id as number | undefined;
-        } catch (itemError) {
+        } catch {
           // Ignore error and continue to next attempt
         }
       }
