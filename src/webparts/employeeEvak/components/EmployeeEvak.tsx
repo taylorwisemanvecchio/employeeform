@@ -46,6 +46,20 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   }
 
   if (selected) {
+    // Validate selected assignment has a valid Id
+    if (!selected.Id || typeof selected.Id !== 'number') {
+      return (
+        <div style={{ padding: 16 }}>
+          <h3>Something went wrong</h3>
+          <p>Invalid assignment selected. Please go back and try again.</p>
+          <DefaultButton
+            text="Back to Pending List"
+            onClick={(): void => setSelected(undefined)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div style={{ padding: 16 }}>
         <Stack horizontal tokens={{ childrenGap: 8 }} style={{ marginBottom: 12 }}>
@@ -78,33 +92,35 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
       {pending.length === 0 && <div>No pending evaluations assigned to you.</div>}
 
       <Stack tokens={{ childrenGap: 10 }}>
-        {pending.map((a: IPendingAssignment) => (
-          <div
-            key={`${a.Id}|${a.MyRole}`}
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 8,
-              padding: 12,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 600 }}>{a.Title}</div>
-              <div style={{ fontSize: 12, color: "#666" }}>
-                Role: {a.MyRole}
-              </div>
-              {(a.ReviewPeriodStart || a.ReviewPeriodEnd) && (
+        {pending
+          .filter((a: IPendingAssignment) => typeof a.Id === 'number')
+          .map((a: IPendingAssignment) => (
+            <div
+              key={`${a.Id}|${a.MyRole}`}
+              style={{
+                border: "1px solid #eee",
+                borderRadius: 8,
+                padding: 12,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>{a.Title}</div>
                 <div style={{ fontSize: 12, color: "#666" }}>
-                  Period: {a.ReviewPeriodStart ?? "—"} to {a.ReviewPeriodEnd ?? "—"}
+                  Role: {a.MyRole}
                 </div>
-              )}
-            </div>
+                {(a.ReviewPeriodStart || a.ReviewPeriodEnd) && (
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    Period: {a.ReviewPeriodStart ?? "—"} to {a.ReviewPeriodEnd ?? "—"}
+                  </div>
+                )}
+              </div>
 
-            <PrimaryButton text="Open" onClick={(): void => setSelected(a)} />
-          </div>
-        ))}
+              <PrimaryButton text="Open" onClick={(): void => setSelected(a)} />
+            </div>
+          ))}
       </Stack>
     </div>
   );

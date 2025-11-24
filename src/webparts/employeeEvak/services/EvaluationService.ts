@@ -110,6 +110,11 @@ export class EvaluationService {
 
     const raw = a as unknown as IRawAssignment;
 
+    // Validate that we got a valid assignment with an Id
+    if (!raw || typeof raw.Id !== 'number') {
+      throw new Error(`Invalid assignment data received for ID ${id}`);
+    }
+
     const mapUser = (
       p?: { Id: number; EMail?: string; Title?: string }
     ): IUserInfo | undefined =>
@@ -198,6 +203,10 @@ export class EvaluationService {
 
     return rawItems
       .filter((it: IRawAssignment) => {
+        // First filter: must have a valid Id
+        return typeof it.Id === 'number';
+      })
+      .filter((it: IRawAssignment) => {
         const e = it.Employee && it.Employee.EMail ? it.Employee.EMail.toLowerCase() : undefined;
         const s = it.Supervisor && it.Supervisor.EMail ? it.Supervisor.EMail.toLowerCase() : undefined;
         const r =
@@ -275,9 +284,16 @@ export class EvaluationService {
 
     const createdId = addRes.data.Id as number | undefined;
 
-    if (!createdId) {
+    if (!createdId || typeof createdId !== 'number') {
+      // Try to get the Id from the item reference
       const full = await addRes.item.select("Id,*")();
-      return full as unknown as IEvaluationResponse;
+      const fullData = full as unknown as IEvaluationResponse;
+
+      if (!fullData || typeof fullData.Id !== 'number') {
+        throw new Error('Failed to create response: No valid Id returned from SharePoint');
+      }
+
+      return fullData;
     }
 
     const fullItem = await this.sp.web.lists
@@ -285,7 +301,13 @@ export class EvaluationService {
       .items.getById(createdId)
       .select("Id,*")();
 
-    return fullItem as unknown as IEvaluationResponse;
+    const result = fullItem as unknown as IEvaluationResponse;
+
+    if (!result || typeof result.Id !== 'number') {
+      throw new Error('Failed to retrieve created response: Invalid data returned');
+    }
+
+    return result;
   }
 
   public async updateResponse(
