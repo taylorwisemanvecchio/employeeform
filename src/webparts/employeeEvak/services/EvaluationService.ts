@@ -274,44 +274,51 @@ export class EvaluationService {
     return items[0] as unknown as IEvaluationResponse;
   }
 
-  // Safe create: add then re-read
+  // Safe create: add then query for the created item
   public async createResponse(
     payload: Record<string, unknown>
   ): Promise<IEvaluationResponse> {
     try {
-      const addRes = await this.sp.web.lists
+      // Create the item
+      await this.sp.web.lists
         .getByTitle(this.responsesList)
         .items.add(payload);
 
-      // Try to get Id from the response data
-      let createdId = addRes?.data?.Id as number | undefined;
+      // Extract the filter criteria from the payload to find the created item
+      const assignmentId = payload.AssignmentIDId as number;
+      const reviewerType = payload.ReviewerType as string;
 
-      // If no Id in data, try to get it from the item reference
-      if (!createdId || typeof createdId !== 'number') {
-        try {
-          const itemData = await addRes.item.select("Id")();
-          createdId = itemData?.Id as number | undefined;
-        } catch {
-          // Ignore error and continue to next attempt
-        }
-      }
+      // Get current user to match the ReviewerName
+      const me = await this.getCurrentUser();
 
-      // If we still don't have an Id, this is a problem
-      if (!createdId || typeof createdId !== 'number') {
-        throw new Error('Failed to get Id from created response');
-      }
+      // Wait a moment for SharePoint to index the new item
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Re-read the full item to ensure we have complete data
-      const fullItem = await this.sp.web.lists
+      // Query for the created item using the same logic as getMyResponse
+      const items = await this.sp.web.lists
         .getByTitle(this.responsesList)
-        .items.getById(createdId)
-        .select("Id,Title,AssignmentIDId,ReviewerType,SubmittedDate")();
+        .items.filter(
+          "AssignmentIDId eq " +
+            assignmentId +
+            " and ReviewerType eq '" +
+            reviewerType +
+            "' and ReviewerName/EMail eq '" +
+            me.Email.replace("'", "''") +
+            "'"
+        )
+        .select("Id,Title,AssignmentIDId,ReviewerType,SubmittedDate")
+        .expand("ReviewerName")
+        .top(1)();
 
-      const result = fullItem as unknown as IEvaluationResponse;
+      if (!items || items.length === 0) {
+        throw new Error('Created response not found after creation');
+      }
+
+      const result = items[0] as unknown as IEvaluationResponse;
 
       // Final validation
       if (!result || typeof result.Id !== 'number') {
-        throw new Error('Failed to retrieve created response: Invalid data');
+        throw new Error('Created response has invalid Id');
       }
 
       return result;
