@@ -113,7 +113,7 @@ export class EvaluationService {
     const mapUser = (
       p?: { Id: number; EMail?: string; Title?: string }
     ): IUserInfo | undefined =>
-      p && p.EMail ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+      p && p.EMail && typeof p.Id === 'number' ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
 
     return {
       Id: raw.Id,
@@ -171,7 +171,9 @@ export class EvaluationService {
         .getByTitle(this.assignmentsList)
         .items.top(200)();
 
-      const ids = (base as Array<{ Id: number }>).map((b) => b.Id);
+      const ids = (base as Array<{ Id: number }>)
+        .filter((b) => typeof b.Id === 'number')
+        .map((b) => b.Id);
 
       items = await Promise.all(
         ids.map((id: number) =>
@@ -189,7 +191,7 @@ export class EvaluationService {
     const normalizeUser = (
       p?: { Id: number; EMail?: string; Title?: string }
     ): IUserInfo | undefined =>
-      p && p.EMail ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+      p && p.EMail && typeof p.Id === 'number' ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
 
     const meLower = me.Email.toLowerCase();
     const doneStatuses = ["complete", "completed", "closed", "archived"];
