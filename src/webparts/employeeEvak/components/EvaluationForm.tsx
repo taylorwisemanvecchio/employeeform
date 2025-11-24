@@ -87,35 +87,19 @@ export const EvaluationForm: React.FC<{
           throw new Error("Assignment not found. Please refresh.");
         }
 
-        let active = await svc.getMyResponse(assignmentId, rt, me.Email);
+        // Check if a response already exists
+        const existing = await svc.getMyResponse(assignmentId, rt, me.Email);
 
-        if (!active) {
-          await svc.createResponse({
-            Title: `${assignment.Title || "Evaluation"} - ${rt}`,
-            AssignmentIDId: assignmentId,
-            ReviewerType: rt,
-            ReviewerNameId: me.Id
-          });
+        if (existing && typeof existing.Id === "number") {
+          // Load existing response
+          setResponse(existing);
+          setResponseId(existing.Id);
+        } else {
+          // Initialize empty response - we'll create it on first save
+          setResponse({} as IEvaluationResponse);
+          setResponseId(undefined);
         }
 
-        if (!active) {
-          for (let i = 0; i < 3; i++) {
-            const reread = await svc.getMyResponse(assignmentId, rt, me.Email);
-            if (reread && typeof reread.Id === "number") {
-              active = reread;
-              break;
-            }
-          }
-        }
-
-        if (!active || typeof active.Id !== "number") {
-          throw new Error(
-            "Response record could not be initialized yet. Please try again."
-          );
-        }
-
-        setResponse(active);
-        setResponseId(active.Id);
         setCategoryIdx(0);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Failed to load evaluation form.";
@@ -134,7 +118,7 @@ export const EvaluationForm: React.FC<{
   };
 
   const onSave = async (submit = false): Promise<void> => {
-    if (!responseId || !response) return;
+    if (!response) return;
 
     try {
       setSaving(true);
@@ -167,7 +151,25 @@ export const EvaluationForm: React.FC<{
         payload.SubmittedDate = new Date().toISOString();
       }
 
-      await svc.updateResponse(responseId, payload);
+      // If we don't have a responseId yet, create the record
+      let currentResponseId = responseId;
+      if (!currentResponseId) {
+        const me = await svc.getCurrentUser();
+        const assignment = await svc.getAssignment(assignmentId);
+
+        const createPayload = {
+          ...payload,
+          Title: `${assignment.Title || "Evaluation"} - ${rt}`,
+          ReviewerNameId: me.Id
+        };
+
+        const created = await svc.createResponse(createPayload);
+        currentResponseId = created.Id;
+        setResponseId(created.Id);
+      } else {
+        // Update existing response
+        await svc.updateResponse(currentResponseId, payload);
+      }
 
       if (submit) {
         await svc.markSubmitted(assignmentId, rt);
@@ -199,7 +201,7 @@ export const EvaluationForm: React.FC<{
     );
   }
 
-  if (!response || !responseId) {
+  if (!response) {
     return (
       <div style={{ padding: 16 }}>
         <h3>Preparing your evaluation…</h3>
