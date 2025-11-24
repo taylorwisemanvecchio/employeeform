@@ -278,36 +278,47 @@ export class EvaluationService {
   public async createResponse(
     payload: Record<string, unknown>
   ): Promise<IEvaluationResponse> {
-    const addRes = await this.sp.web.lists
-      .getByTitle(this.responsesList)
-      .items.add(payload);
+    try {
+      const addRes = await this.sp.web.lists
+        .getByTitle(this.responsesList)
+        .items.add(payload);
 
-    const createdId = addRes.data.Id as number | undefined;
+      // Try to get Id from the response data
+      let createdId = addRes?.data?.Id as number | undefined;
 
-    if (!createdId || typeof createdId !== 'number') {
-      // Try to get the Id from the item reference
-      const full = await addRes.item.select("Id,*")();
-      const fullData = full as unknown as IEvaluationResponse;
-
-      if (!fullData || typeof fullData.Id !== 'number') {
-        throw new Error('Failed to create response: No valid Id returned from SharePoint');
+      // If no Id in data, try to get it from the item reference
+      if (!createdId || typeof createdId !== 'number') {
+        try {
+          const itemData = await addRes.item.select("Id")();
+          createdId = itemData?.Id as number | undefined;
+        } catch (itemError) {
+          // Ignore error and continue to next attempt
+        }
       }
 
-      return fullData;
+      // If we still don't have an Id, this is a problem
+      if (!createdId || typeof createdId !== 'number') {
+        throw new Error('Failed to get Id from created response');
+      }
+
+      // Re-read the full item to ensure we have complete data
+      const fullItem = await this.sp.web.lists
+        .getByTitle(this.responsesList)
+        .items.getById(createdId)
+        .select("Id,Title,AssignmentIDId,ReviewerType,SubmittedDate")();
+
+      const result = fullItem as unknown as IEvaluationResponse;
+
+      // Final validation
+      if (!result || typeof result.Id !== 'number') {
+        throw new Error('Failed to retrieve created response: Invalid data');
+      }
+
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Create response failed: ${errorMsg}`);
     }
-
-    const fullItem = await this.sp.web.lists
-      .getByTitle(this.responsesList)
-      .items.getById(createdId)
-      .select("Id,*")();
-
-    const result = fullItem as unknown as IEvaluationResponse;
-
-    if (!result || typeof result.Id !== 'number') {
-      throw new Error('Failed to retrieve created response: Invalid data returned');
-    }
-
-    return result;
   }
 
   public async updateResponse(

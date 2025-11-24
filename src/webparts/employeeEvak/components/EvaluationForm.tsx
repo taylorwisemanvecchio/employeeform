@@ -155,7 +155,14 @@ export const EvaluationForm: React.FC<{
       let currentResponseId = responseId;
       if (!currentResponseId) {
         const me = await svc.getCurrentUser();
+        if (!me || typeof me.Id !== 'number') {
+          throw new Error('Unable to get current user information');
+        }
+
         const assignment = await svc.getAssignment(assignmentId);
+        if (!assignment || typeof assignment.Id !== 'number') {
+          throw new Error('Unable to get assignment information');
+        }
 
         const createPayload = {
           ...payload,
@@ -164,8 +171,17 @@ export const EvaluationForm: React.FC<{
         };
 
         const created = await svc.createResponse(createPayload);
+
+        // Validate the created response has a valid Id
+        if (!created || typeof created.Id !== 'number') {
+          throw new Error('Failed to create response: Invalid response data returned');
+        }
+
         currentResponseId = created.Id;
         setResponseId(created.Id);
+
+        // Update local state with the full created response
+        setResponse(created);
       } else {
         // Update existing response
         await svc.updateResponse(currentResponseId, payload);
