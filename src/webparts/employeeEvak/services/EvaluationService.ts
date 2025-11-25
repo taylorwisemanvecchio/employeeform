@@ -353,4 +353,73 @@ export class EvaluationService {
       .items.getById(assignmentId)
       .update(payload);
   }
+
+  /**
+   * Get all assignments where the current user is the supervisor
+   */
+  public async getAssignmentsWhereSupervisor(): Promise<IAssignment[]> {
+    const me = await this.getCurrentUser();
+    const emailLower = me.Email.replace("'", "''").toLowerCase();
+
+    const filter = "Supervisor/EMail eq '" + emailLower + "'";
+
+    const selectExpand =
+      "Id,Title,ReviewPeriodStart,ReviewPeriodEnd,Status," +
+      "SelfEvalSubmitted,SupervisorSubmitted,ReviewerSubmitted," +
+      "Employee/Id,Employee/Title,Employee/EMail," +
+      "Supervisor/Id,Supervisor/Title,Supervisor/EMail," +
+      "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail";
+
+    const items = await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.filter(filter)
+      .select(selectExpand)
+      .expand("Employee,Supervisor,OptionalReviewer")();
+
+    const rawItems = items as unknown as IRawAssignment[];
+
+    const normalizeUser = (
+      p?: { Id: number; EMail?: string; Title?: string }
+    ): IUserInfo | undefined =>
+      p && p.EMail && typeof p.Id === 'number' ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+
+    return rawItems
+      .filter((it: IRawAssignment) => {
+        return typeof it.Id === 'number';
+      })
+      .map((it: IRawAssignment): IAssignment => {
+        return {
+          Id: it.Id,
+          Title: it.Title,
+          ReviewPeriodStart: it.ReviewPeriodStart,
+          ReviewPeriodEnd: it.ReviewPeriodEnd,
+          Status: it.Status,
+          SelfEvalSubmitted: it.SelfEvalSubmitted,
+          SupervisorSubmitted: it.SupervisorSubmitted,
+          ReviewerSubmitted: it.ReviewerSubmitted,
+          Employee: normalizeUser(it.Employee),
+          Supervisor: normalizeUser(it.Supervisor),
+          OptionalReviewer: normalizeUser(it.OptionalReviewer)
+        };
+      });
+  }
+
+  /**
+   * Update or clear the OptionalReviewer field for an assignment
+   * @param assignmentId - The assignment ID to update
+   * @param reviewerId - The user ID of the optional reviewer, or undefined to clear
+   */
+  public async updateOptionalReviewer(
+    assignmentId: number,
+    reviewerId: number | undefined
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
+      OptionalReviewerId: reviewerId ?? undefined
+    };
+
+    await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.getById(assignmentId)
+      .update(payload);
+  }
 }
