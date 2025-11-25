@@ -15,6 +15,18 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | undefined>(undefined);
   const [selected, setSelected] = React.useState<IPendingAssignment | undefined>(undefined);
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
+
+  // Detect mobile viewport
+  React.useEffect((): (() => void) => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return (): void => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   React.useEffect((): void => {
     (async (): Promise<void> => {
@@ -33,12 +45,12 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   }, [svc]);
 
   if (loading) {
-    return <div style={{ padding: 16 }}>Loading pending evaluations…</div>;
+    return <div style={{ padding: isMobile ? 8 : 16 }}>Loading pending evaluations…</div>;
   }
 
   if (error) {
     return (
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: isMobile ? 8 : 16 }}>
         <h3>Something went wrong</h3>
         <p>{error}</p>
       </div>
@@ -49,28 +61,34 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
     // Validate selected assignment has a valid Id
     if (!selected.Id || typeof selected.Id !== 'number') {
       return (
-        <div style={{ padding: 16 }}>
+        <div style={{ padding: isMobile ? 8 : 16 }}>
           <h3>Something went wrong</h3>
           <p>Invalid assignment selected. Please go back and try again.</p>
           <DefaultButton
-            text="Back to Pending List"
+            text={isMobile ? "Back" : "Back to Pending List"}
             onClick={(): void => setSelected(undefined)}
+            styles={{ root: { width: isMobile ? "100%" : "auto" } }}
           />
         </div>
       );
     }
 
     return (
-      <div style={{ padding: 16 }}>
-        <Stack horizontal tokens={{ childrenGap: 8 }} style={{ marginBottom: 12 }}>
+      <div style={{ padding: isMobile ? 8 : 16 }}>
+        <Stack
+          horizontal={!isMobile}
+          tokens={{ childrenGap: 8 }}
+          style={{ marginBottom: 12 }}
+        >
           <DefaultButton
-            text="Back to Pending List"
+            text={isMobile ? "Back" : "Back to Pending List"}
             onClick={(): void => setSelected(undefined)}
+            styles={{ root: { width: isMobile ? "100%" : "auto" } }}
           />
         </Stack>
 
-        <h2 style={{ marginTop: 0 }}>{selected.Title}</h2>
-        <div style={{ marginBottom: 12, color: "#555" }}>
+        <h2 style={{ marginTop: 0, fontSize: isMobile ? "1.2em" : "1.5em" }}>{selected.Title}</h2>
+        <div style={{ marginBottom: 12, color: "#555", fontSize: isMobile ? "0.9em" : "1em" }}>
           Role: <strong>{selected.MyRole}</strong>
         </div>
 
@@ -86,10 +104,14 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <h2 style={{ marginTop: 0 }}>Pending Evaluations</h2>
+    <div style={{ padding: isMobile ? 8 : 16 }}>
+      <h2 style={{ marginTop: 0, fontSize: isMobile ? "1.2em" : "1.5em" }}>Pending Evaluations</h2>
 
-      {pending.length === 0 && <div>No pending evaluations assigned to you.</div>}
+      {pending.length === 0 && (
+        <div style={{ fontSize: isMobile ? "0.9em" : "1em" }}>
+          No pending evaluations assigned to you.
+        </div>
+      )}
 
       <Stack tokens={{ childrenGap: 10 }}>
         {pending
@@ -100,25 +122,42 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
               style={{
                 border: "1px solid #eee",
                 borderRadius: 8,
-                padding: 12,
+                padding: isMobile ? 10 : 12,
                 display: "flex",
+                flexDirection: isMobile ? "column" : "row",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: isMobile ? "stretch" : "center",
+                gap: isMobile ? 10 : 0
               }}
             >
-              <div>
-                <div style={{ fontWeight: 600 }}>{a.Title}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontWeight: 600,
+                  fontSize: isMobile ? "0.95em" : "1em",
+                  marginBottom: isMobile ? 4 : 0
+                }}>
+                  {a.Title}
+                </div>
+                <div style={{ fontSize: isMobile ? 11 : 12, color: "#666" }}>
                   Role: {a.MyRole}
                 </div>
                 {(a.ReviewPeriodStart || a.ReviewPeriodEnd) && (
-                  <div style={{ fontSize: 12, color: "#666" }}>
+                  <div style={{ fontSize: isMobile ? 11 : 12, color: "#666" }}>
                     Period: {a.ReviewPeriodStart ?? "—"} to {a.ReviewPeriodEnd ?? "—"}
                   </div>
                 )}
               </div>
 
-              <PrimaryButton text="Open" onClick={(): void => setSelected(a)} />
+              <PrimaryButton
+                text="Open"
+                onClick={(): void => setSelected(a)}
+                styles={{
+                  root: {
+                    width: isMobile ? "100%" : "auto",
+                    minWidth: isMobile ? "auto" : 80
+                  }
+                }}
+              />
             </div>
           ))}
       </Stack>

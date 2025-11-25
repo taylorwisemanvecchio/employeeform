@@ -230,10 +230,34 @@ export const EvaluationForm: React.FC<{
   const cat = cats[categoryIdx];
   const isLastCategory = categoryIdx >= cats.length - 1;
 
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
+
+  // Detect mobile viewport
+  React.useEffect((): (() => void) => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return (): void => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <div style={{ display: "flex", gap: 16 }}>
-      {/* Left Nav */}
-      <div style={{ width: 260 }}>
+    <div style={{
+      display: "flex",
+      flexDirection: isMobile ? "column" : "row",
+      gap: 16
+    }}>
+      {/* Left Nav - Horizontal scroll on mobile */}
+      <div style={{
+        width: isMobile ? "100%" : 260,
+        display: isMobile ? "flex" : "block",
+        overflowX: isMobile ? "auto" : "visible",
+        gap: isMobile ? 8 : 0,
+        paddingBottom: isMobile ? 8 : 0,
+        marginBottom: isMobile ? 16 : 0
+      }}>
         {cats.map((c: ICategoryDef, i: number) => (
           <div
             key={c.name}
@@ -244,7 +268,11 @@ export const EvaluationForm: React.FC<{
               background: i === categoryIdx ? "#0b6a53" : "white",
               color: i === categoryIdx ? "white" : "#333",
               borderRadius: 6,
-              marginBottom: 6
+              marginBottom: isMobile ? 0 : 6,
+              minWidth: isMobile ? "150px" : "auto",
+              textAlign: "center",
+              border: isMobile && i === categoryIdx ? "2px solid #0b6a53" : "1px solid #ddd",
+              whiteSpace: "nowrap"
             }}
           >
             {c.name}
@@ -253,8 +281,8 @@ export const EvaluationForm: React.FC<{
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1 }}>
-        <h2>{cat.name}</h2>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h2 style={{ fontSize: isMobile ? "1.2em" : "1.5em" }}>{cat.name}</h2>
 
         {cat.questions.map((q: IQuestionDef) => {
           const ratingVal = response[q.key];
@@ -269,23 +297,32 @@ export const EvaluationForm: React.FC<{
             <div
               key={q.key}
               style={{
-                padding: 12,
+                padding: isMobile ? 8 : 12,
                 border: "1px solid #eee",
                 borderRadius: 8,
                 marginBottom: 12
               }}
             >
-              <div style={{ fontWeight: 600, color: "#0b6a53", marginBottom: 6 }}>
+              <div style={{
+                fontWeight: 600,
+                color: "#0b6a53",
+                marginBottom: 6,
+                fontSize: isMobile ? "0.9em" : "1em"
+              }}>
                 {q.text}
               </div>
 
-              <Stack horizontal tokens={{ childrenGap: 12 }}>
+              <Stack
+                horizontal={!isMobile}
+                tokens={{ childrenGap: 12 }}
+                styles={{ root: { flexWrap: isMobile ? "wrap" : "nowrap" } }}
+              >
                 <Dropdown
                   label="My Rating"
                   options={ratingOptions}
                   selectedKey={selectedKey}
                   onChange={(_, opt): void => updateField(q.key, opt?.key)}
-                  styles={{ root: { width: 280 } }}
+                  styles={{ root: { width: isMobile ? "100%" : 280 } }}
                 />
 
                 <TextField
@@ -294,20 +331,25 @@ export const EvaluationForm: React.FC<{
                   autoAdjustHeight
                   value={commentText}
                   onChange={(_, v): void => updateField(q.commentKey, v ?? "")}
-                  styles={{ root: { flex: 1 } }}
+                  styles={{ root: { flex: 1, width: isMobile ? "100%" : "auto" } }}
                 />
               </Stack>
             </div>
           );
         })}
 
-        <Stack horizontal tokens={{ childrenGap: 8 }}>
+        <Stack
+          horizontal={!isMobile}
+          tokens={{ childrenGap: 8 }}
+          styles={{ root: { marginTop: 16 } }}
+        >
           <DefaultButton
             text="Save"
             onClick={(): void => {
               onSave(false).catch((): void => {});
             }}
             disabled={saving}
+            styles={{ root: { width: isMobile ? "100%" : "auto" } }}
           />
 
           {!isLastCategory ? (
@@ -315,6 +357,7 @@ export const EvaluationForm: React.FC<{
               text="Next Section"
               onClick={(): void => setCategoryIdx(categoryIdx + 1)}
               disabled={saving}
+              styles={{ root: { width: isMobile ? "100%" : "auto" } }}
             />
           ) : (
             <PrimaryButton
@@ -323,18 +366,28 @@ export const EvaluationForm: React.FC<{
                 onSave(true).catch((): void => {});
               }}
               disabled={saving}
+              styles={{ root: { width: isMobile ? "100%" : "auto" } }}
             />
           )}
         </Stack>
       </div>
 
-      {/* Rating Scale Panel */}
-      <div style={{ width: 260, borderLeft: "1px solid #eee", paddingLeft: 12 }}>
-        <h3>Rating Scale</h3>
-        <div>1 – Unsatisfactory</div>
-        <div>2 – Needs Development</div>
-        <div>3 – Meets Expectations</div>
-        <div>4 – Exceeds Expectations</div>
+      {/* Rating Scale Panel - Show as collapsible on mobile */}
+      <div style={{
+        width: isMobile ? "100%" : 260,
+        borderLeft: isMobile ? "none" : "1px solid #eee",
+        borderTop: isMobile ? "1px solid #eee" : "none",
+        paddingLeft: isMobile ? 0 : 12,
+        paddingTop: isMobile ? 12 : 0,
+        marginTop: isMobile ? 16 : 0
+      }}>
+        <h3 style={{ fontSize: isMobile ? "1em" : "1.17em", marginTop: 0 }}>Rating Scale</h3>
+        <div style={{ fontSize: isMobile ? "0.9em" : "1em", lineHeight: isMobile ? "1.6" : "1.5" }}>
+          <div>1 – Unsatisfactory</div>
+          <div>2 – Needs Development</div>
+          <div>3 – Meets Expectations</div>
+          <div>4 – Exceeds Expectations</div>
+        </div>
       </div>
     </div>
   );

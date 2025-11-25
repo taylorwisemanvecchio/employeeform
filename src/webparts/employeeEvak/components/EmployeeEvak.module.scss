@@ -5,6 +5,12 @@
   padding: 1em;
   color: "[theme:bodyText, default: #323130]";
   color: var(--bodyText);
+
+  // Responsive padding for mobile
+  @media (max-width: 768px) {
+    padding: 0.5em;
+  }
+
   &.teams {
     font-family: $ms-font-family-fallbacks;
   }
@@ -30,5 +36,29 @@
       color: "[theme:linkHovered, default: #014446]";
       color: var(--linkHovered); // note: CSS Custom Properties support is limited to modern browsers only
     }
+  }
+}
+
+// Responsive utility classes
+.responsiveContainer {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mobileStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media (min-width: 769px) {
+    flex-direction: row;
+  }
+}
+
+.mobileFullWidth {
+  @media (max-width: 768px) {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
