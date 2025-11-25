@@ -55,8 +55,20 @@ export const EvaluationForm: React.FC<{
     React.useState<boolean>(true);
   const [err, setErr] =
     React.useState<string | undefined>(undefined);
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
 
   const initKeyRef = React.useRef<string | undefined>(undefined);
+
+  // Detect mobile viewport
+  React.useEffect((): (() => void) => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return (): void => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   React.useEffect((): void => {
     if (!assignmentId || isNaN(assignmentId)) {
@@ -229,19 +241,6 @@ export const EvaluationForm: React.FC<{
   const cats = CATEGORIES as ICategoryDef[];
   const cat = cats[categoryIdx];
   const isLastCategory = categoryIdx >= cats.length - 1;
-
-  const [isMobile, setIsMobile] = React.useState<boolean>(false);
-
-  // Detect mobile viewport
-  React.useEffect((): (() => void) => {
-    const checkMobile = (): void => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return (): void => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   return (
     <div style={{
