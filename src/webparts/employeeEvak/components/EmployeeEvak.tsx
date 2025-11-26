@@ -4,6 +4,7 @@ import type { IEmployeeEvakProps } from "./IEmployeeEvakProps";
 
 import { EvaluationService, IPendingAssignment } from "../services/EvaluationService";
 import EvaluationForm from "./EvaluationForm";
+import SupervisorDashboard from "./SupervisorDashboard";
 import { PrimaryButton, DefaultButton, Stack } from "@fluentui/react";
 
 // Hoisted function avoids no-use-before-define
@@ -165,13 +166,116 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   );
 }
 
+type ViewType = "pending" | "supervisor";
+
+function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
+  const { sp } = props;
+  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp), [sp]);
+
+  const [currentView, setCurrentView] = React.useState<ViewType>("pending");
+  const [isSupervisor, setIsSupervisor] = React.useState<boolean>(false);
+  const [checkingSupervisor, setCheckingSupervisor] = React.useState<boolean>(true);
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
+
+  // Detect mobile viewport
+  React.useEffect((): (() => void) => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return (): void => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Check if current user is a supervisor
+  React.useEffect((): void => {
+    (async (): Promise<void> => {
+      try {
+        const assignments = await svc.getAssignmentsWhereSupervisor();
+        setIsSupervisor(assignments.length > 0);
+      } catch {
+        // If error checking, assume not a supervisor
+        setIsSupervisor(false);
+      } finally {
+        setCheckingSupervisor(false);
+      }
+    })().catch((): void => {});
+  }, [svc]);
+
+  if (checkingSupervisor) {
+    return <div style={{ padding: isMobile ? 8 : 16 }}>Loading…</div>;
+  }
+
+  return (
+    <div>
+      {/* Navigation tabs - only show if user is a supervisor */}
+      {isSupervisor && (
+        <div
+          style={{
+            backgroundColor: "#f5f5f5",
+            borderBottom: "2px solid #0b6a53",
+            padding: isMobile ? "8px 8px 0" : "12px 16px 0"
+          }}
+        >
+          <Stack
+            horizontal={!isMobile}
+            tokens={{ childrenGap: isMobile ? 8 : 12 }}
+            style={{ marginBottom: isMobile ? 8 : 0 }}
+          >
+            <button
+              onClick={(): void => setCurrentView("pending")}
+              style={{
+                padding: isMobile ? "8px 12px" : "10px 16px",
+                backgroundColor: currentView === "pending" ? "#0b6a53" : "transparent",
+                color: currentView === "pending" ? "#fff" : "#333",
+                border: "none",
+                borderRadius: "4px 4px 0 0",
+                cursor: "pointer",
+                fontSize: isMobile ? "0.9em" : "1em",
+                fontWeight: currentView === "pending" ? 600 : 400,
+                width: isMobile ? "100%" : "auto"
+              }}
+            >
+              My Evaluations
+            </button>
+            <button
+              onClick={(): void => setCurrentView("supervisor")}
+              style={{
+                padding: isMobile ? "8px 12px" : "10px 16px",
+                backgroundColor: currentView === "supervisor" ? "#0b6a53" : "transparent",
+                color: currentView === "supervisor" ? "#fff" : "#333",
+                border: "none",
+                borderRadius: "4px 4px 0 0",
+                cursor: "pointer",
+                fontSize: isMobile ? "0.9em" : "1em",
+                fontWeight: currentView === "supervisor" ? 600 : 400,
+                width: isMobile ? "100%" : "auto"
+              }}
+            >
+              Supervisor Dashboard
+            </button>
+          </Stack>
+        </div>
+      )}
+
+      {/* Main content */}
+      {currentView === "pending" ? (
+        <PendingAssignmentsDashboard sp={sp} />
+      ) : (
+        <SupervisorDashboard sp={sp} />
+      )}
+    </div>
+  );
+}
+
 export default class EmployeeEvak extends React.Component<IEmployeeEvakProps> {
   public render(): React.ReactElement<IEmployeeEvakProps> {
     const { sp, hasTeamsContext } = this.props;
 
     return (
       <section className={`${styles.employeeEvak} ${hasTeamsContext ? styles.teams : ""}`}>
-        <PendingAssignmentsDashboard sp={sp} />
+        <MainApp sp={sp} />
       </section>
     );
   }
