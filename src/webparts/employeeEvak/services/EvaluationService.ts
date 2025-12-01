@@ -25,6 +25,7 @@ export interface IAssignment {
   Employee?: IUserInfo;
   Supervisor?: IUserInfo;
   OptionalReviewer?: IUserInfo;
+  ProposedReviewer?: IUserInfo;
 }
 
 export interface IEvaluationResponse extends Record<string, unknown> {
@@ -54,6 +55,7 @@ interface IRawAssignment {
   Employee?: { Id: number; EMail?: string; Title?: string };
   Supervisor?: { Id: number; EMail?: string; Title?: string };
   OptionalReviewer?: { Id: number; EMail?: string; Title?: string };
+  ProposedReviewer?: { Id: number; EMail?: string; Title?: string };
 }
 
 export class EvaluationService {
@@ -368,13 +370,14 @@ export class EvaluationService {
       "SelfEvalSubmitted,SupervisorSubmitted,ReviewerSubmitted," +
       "Employee/Id,Employee/Title,Employee/EMail," +
       "Supervisor/Id,Supervisor/Title,Supervisor/EMail," +
-      "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail";
+      "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail," +
+      "ProposedReviewer/Id,ProposedReviewer/Title,ProposedReviewer/EMail";
 
     const items = await this.sp.web.lists
       .getByTitle(this.assignmentsList)
       .items.filter(filter)
       .select(selectExpand)
-      .expand("Employee,Supervisor,OptionalReviewer")();
+      .expand("Employee,Supervisor,OptionalReviewer,ProposedReviewer")();
 
     const rawItems = items as unknown as IRawAssignment[];
 
@@ -399,7 +402,8 @@ export class EvaluationService {
           ReviewerSubmitted: it.ReviewerSubmitted,
           Employee: normalizeUser(it.Employee),
           Supervisor: normalizeUser(it.Supervisor),
-          OptionalReviewer: normalizeUser(it.OptionalReviewer)
+          OptionalReviewer: normalizeUser(it.OptionalReviewer),
+          ProposedReviewer: normalizeUser(it.ProposedReviewer)
         };
       });
   }
@@ -415,6 +419,26 @@ export class EvaluationService {
   ): Promise<void> {
     const payload: Record<string, unknown> = {
       OptionalReviewerId: reviewerId ?? undefined
+    };
+
+    await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.getById(assignmentId)
+      .update(payload);
+  }
+
+  /**
+   * Add the proposed reviewer as an optional approver
+   * @param assignmentId - The assignment ID to update
+   * @param reviewerId - The user ID of the proposed reviewer to add as optional approver
+   */
+  public async addOptionalApprover(
+    assignmentId: number,
+    reviewerId: number
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
+      OptionalReviewerId: reviewerId,
+      SendOptionalEmail: true
     };
 
     await this.sp.web.lists

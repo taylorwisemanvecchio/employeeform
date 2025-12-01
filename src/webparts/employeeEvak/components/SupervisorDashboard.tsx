@@ -1,6 +1,6 @@
 import * as React from "react";
 import { EvaluationService, IAssignment } from "../services/EvaluationService";
-import { PrimaryButton, DefaultButton, Stack } from "@fluentui/react";
+import { PrimaryButton, Stack } from "@fluentui/react";
 import type { IEmployeeEvakProps } from "./IEmployeeEvakProps";
 
 interface ISupervisorDashboardProps {
@@ -47,23 +47,19 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
     loadAssignments().catch((): void => {});
   }, [loadAssignments]);
 
-  const handleOptionalReviewerChange = async (
+  const handleAddOptionalApprover = async (
     assignmentId: number,
-    keepReviewer: boolean,
-    currentReviewerId: number | undefined
+    proposedReviewerId: number
   ): Promise<void> => {
     try {
       setUpdatingId(assignmentId);
 
-      // If keeping reviewer, do nothing; if not keeping, set to undefined
-      if (!keepReviewer) {
-        await svc.updateOptionalReviewer(assignmentId, undefined);
-        // Reload assignments to reflect the change
-        await loadAssignments();
-        alert("Optional reviewer removed successfully.");
-      }
+      await svc.addOptionalApprover(assignmentId, proposedReviewerId);
+      // Reload assignments to reflect the change
+      await loadAssignments();
+      alert("Optional approver added successfully.");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to update optional reviewer.";
+      const msg = e instanceof Error ? e.message : "Failed to add optional approver.";
       alert(`Error: ${msg}`);
     } finally {
       setUpdatingId(undefined);
@@ -100,14 +96,14 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
         Supervisor Dashboard
       </h2>
       <p style={{ color: "#555", fontSize: isMobile ? "0.9em" : "1em" }}>
-        Manage optional reviewers for your employees
+        Review proposed optional reviewers for your employees
       </p>
 
       <Stack tokens={{ childrenGap: 12 }}>
         {assignments
           .filter((a: IAssignment) => typeof a.Id === 'number')
           .map((a: IAssignment) => {
-            const hasOptionalReviewer = a.OptionalReviewer && a.OptionalReviewer.Id;
+            const hasProposedReviewer = a.ProposedReviewer && a.ProposedReviewer.Id;
             const isUpdating = updatingId === a.Id;
 
             return (
@@ -143,7 +139,7 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
                   )}
                 </div>
 
-                {/* Optional Reviewer Section */}
+                {/* Proposed Reviewer Section */}
                 <div
                   style={{
                     display: "flex",
@@ -163,68 +159,47 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
                       color: "#0b6a53",
                       marginBottom: 4
                     }}>
-                      Optional Reviewer
+                      Proposed Reviewer
                     </div>
                     <div style={{ fontSize: isMobile ? 13 : 14 }}>
-                      {hasOptionalReviewer ? (
+                      {hasProposedReviewer ? (
                         <span style={{ color: "#333" }}>
-                          {a.OptionalReviewer?.Title || "Unknown"}
+                          {a.ProposedReviewer?.Title || "Unknown"}
                         </span>
                       ) : (
                         <span style={{ color: "#999", fontStyle: "italic" }}>
-                          No optional reviewer assigned
+                          No proposed reviewer
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Action Buttons - Only show if there's an optional reviewer */}
-                  {hasOptionalReviewer && (
-                    <Stack
-                      horizontal={!isMobile}
-                      tokens={{ childrenGap: 8 }}
-                      style={{ width: isMobile ? "100%" : "auto" }}
-                    >
-                      <PrimaryButton
-                        text="Keep"
-                        disabled={isUpdating}
-                        onClick={(): void => {
-                          // Do nothing - reviewer is already set
-                          alert("Optional reviewer will be kept.");
-                        }}
-                        styles={{
-                          root: {
-                            width: isMobile ? "100%" : "auto",
-                            minWidth: 80,
-                            backgroundColor: "#0b6a53",
-                            borderColor: "#0b6a53"
-                          },
-                          rootHovered: {
-                            backgroundColor: "#095847",
-                            borderColor: "#095847"
-                          }
-                        }}
-                      />
-                      <DefaultButton
-                        text="Remove"
-                        disabled={isUpdating}
-                        onClick={(): void => {
-                          if (confirm(`Remove ${a.OptionalReviewer?.Title} as optional reviewer?`)) {
-                            handleOptionalReviewerChange(
-                              a.Id,
-                              false,
-                              a.OptionalReviewer?.Id
-                            ).catch((): void => {});
-                          }
-                        }}
-                        styles={{
-                          root: {
-                            width: isMobile ? "100%" : "auto",
-                            minWidth: 80
-                          }
-                        }}
-                      />
-                    </Stack>
+                  {/* Action Button - Only show if there's a proposed reviewer */}
+                  {hasProposedReviewer && (
+                    <PrimaryButton
+                      text="Add Optional Approver"
+                      disabled={isUpdating}
+                      onClick={(): void => {
+                        if (confirm(`Add ${a.ProposedReviewer?.Title} as optional approver?`)) {
+                          handleAddOptionalApprover(
+                            a.Id,
+                            a.ProposedReviewer!.Id
+                          ).catch((): void => {});
+                        }
+                      }}
+                      styles={{
+                        root: {
+                          width: isMobile ? "100%" : "auto",
+                          minWidth: 160,
+                          backgroundColor: "#0b6a53",
+                          borderColor: "#0b6a53"
+                        },
+                        rootHovered: {
+                          backgroundColor: "#095847",
+                          borderColor: "#095847"
+                        }
+                      }}
+                    />
                   )}
                 </div>
               </div>
