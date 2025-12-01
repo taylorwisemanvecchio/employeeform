@@ -102,6 +102,15 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
       <Stack tokens={{ childrenGap: 12 }}>
         {assignments
           .filter((a: IAssignment) => typeof a.Id === 'number')
+          .filter((a: IAssignment) => {
+            // Only show assignments where ProposedReviewer hasn't been approved yet
+            // Hide if OptionalReviewer.Id equals ProposedReviewer.Id
+            const proposedId = a.ProposedReviewer?.Id;
+            const optionalId = a.OptionalReviewer?.Id;
+
+            // Show if there's a ProposedReviewer and it's different from OptionalReviewer
+            return proposedId && proposedId !== optionalId;
+          })
           .map((a: IAssignment) => {
             const hasProposedReviewer = a.ProposedReviewer && a.ProposedReviewer.Id;
             const isUpdating = updatingId === a.Id;
