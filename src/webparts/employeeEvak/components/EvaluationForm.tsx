@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
-  Dropdown,
-  IDropdownOption,
+  ChoiceGroup,
+  IChoiceGroupOption,
   TextField,
   PrimaryButton,
   DefaultButton,
@@ -29,11 +29,11 @@ interface ICategoryDef {
   questions: IQuestionDef[];
 }
 
-const ratingOptions: IDropdownOption[] = [
-  { key: 1, text: "1 - Unsatisfactory" },
-  { key: 2, text: "2 - Needs Development" },
-  { key: 3, text: "3 - Meets Expectations" },
-  { key: 4, text: "4 - Exceeds Expectations" }
+const ratingOptions: IChoiceGroupOption[] = [
+  { key: "1", text: "1 - Unsatisfactory" },
+  { key: "2", text: "2 - Needs Development" },
+  { key: "3", text: "3 - Meets Expectations" },
+  { key: "4", text: "4 - Exceeds Expectations" }
 ];
 
 export const EvaluationForm: React.FC<{
@@ -316,13 +316,32 @@ export const EvaluationForm: React.FC<{
                 tokens={{ childrenGap: 12 }}
                 styles={{ root: { flexWrap: isMobile ? "wrap" : "nowrap" } }}
               >
-                <Dropdown
-                  label="My Rating"
-                  options={ratingOptions}
-                  selectedKey={selectedKey}
-                  onChange={(_, opt): void => updateField(q.key, opt?.key)}
-                  styles={{ root: { width: isMobile ? "100%" : 280 } }}
-                />
+                <div style={{ width: isMobile ? "100%" : 280 }}>
+                  <ChoiceGroup
+                    label="My Rating"
+                    options={ratingOptions}
+                    selectedKey={selectedKey?.toString()}
+                    onChange={(_, opt): void => {
+                      if (opt?.key) {
+                        updateField(q.key, parseInt(opt.key, 10));
+                      }
+                    }}
+                    styles={{
+                      flexContainer: {
+                        display: "flex",
+                        flexDirection: isMobile ? "column" : "row",
+                        flexWrap: "wrap",
+                        gap: isMobile ? "8px" : "12px"
+                      },
+                      root: {
+                        ".ms-ChoiceField": {
+                          marginTop: 0,
+                          marginBottom: 0
+                        }
+                      }
+                    }}
+                  />
+                </div>
 
                 <TextField
                   label="Comments"
