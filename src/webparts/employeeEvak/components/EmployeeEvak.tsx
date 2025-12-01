@@ -117,6 +117,19 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
       <Stack tokens={{ childrenGap: 10 }}>
         {pending
           .filter((a: IPendingAssignment) => typeof a.Id === 'number')
+          .filter((a: IPendingAssignment) => {
+            // Hide assignments that have been submitted by the current user's role
+            if (a.MyRole === "Employee" && a.SelfEvalSubmitted) {
+              return false;
+            }
+            if (a.MyRole === "Supervisor" && a.SupervisorSubmitted) {
+              return false;
+            }
+            if (a.MyRole === "Reviewer" && a.ReviewerSubmitted) {
+              return false;
+            }
+            return true;
+          })
           .map((a: IPendingAssignment) => (
             <div
               key={`${a.Id}|${a.MyRole}`}
