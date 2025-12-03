@@ -201,9 +201,11 @@ export const EvaluationForm: React.FC<{
 
       if (submit) {
         await svc.markSubmitted(assignmentId, rt);
+        alert("Submitted!");
+        window.location.href = "https://taylorwiseman.sharepoint.com/sites/EmployeeEvaluation";
+      } else {
+        alert("Saved");
       }
-
-      alert(submit ? "Submitted!" : "Saved");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Save failed.";
       alert(msg);
@@ -260,7 +262,10 @@ export const EvaluationForm: React.FC<{
         {cats.map((c: ICategoryDef, i: number) => (
           <div
             key={c.name}
-            onClick={(): void => setCategoryIdx(i)}
+            onClick={(): void => {
+              setCategoryIdx(i);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             style={{
               padding: "10px 12px",
               cursor: "pointer",
@@ -271,7 +276,8 @@ export const EvaluationForm: React.FC<{
               minWidth: isMobile ? "150px" : "auto",
               textAlign: "center",
               border: isMobile && i === categoryIdx ? "2px solid #0b6a53" : "1px solid #ddd",
-              whiteSpace: "nowrap"
+              wordWrap: "break-word",
+              whiteSpace: "normal"
             }}
           >
             {c.name}
@@ -373,7 +379,10 @@ export const EvaluationForm: React.FC<{
           {!isLastCategory ? (
             <PrimaryButton
               text="Next Section"
-              onClick={(): void => setCategoryIdx(categoryIdx + 1)}
+              onClick={(): void => {
+                setCategoryIdx(categoryIdx + 1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               disabled={saving}
               styles={{ root: { width: isMobile ? "100%" : "auto" } }}
             />
