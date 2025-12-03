@@ -5,6 +5,7 @@ import type { IEmployeeEvakProps } from "./IEmployeeEvakProps";
 import { EvaluationService, IPendingAssignment } from "../services/EvaluationService";
 import EvaluationForm from "./EvaluationForm";
 import SupervisorDashboard from "./SupervisorDashboard";
+import { AdminDashboard } from "./AdminDashboard";
 import { PrimaryButton, DefaultButton, Stack } from "@fluentui/react";
 
 // Hoisted function avoids no-use-before-define
@@ -179,7 +180,7 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   );
 }
 
-type ViewType = "pending" | "supervisor";
+type ViewType = "pending" | "supervisor" | "admin";
 
 function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
   const { sp } = props;
@@ -187,6 +188,7 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
 
   const [currentView, setCurrentView] = React.useState<ViewType>("pending");
   const [isSupervisor, setIsSupervisor] = React.useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
   const [checkingSupervisor, setCheckingSupervisor] = React.useState<boolean>(true);
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
 
@@ -201,15 +203,20 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
     return (): void => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Check if current user is a supervisor
+  // Check if current user is a supervisor and/or admin
   React.useEffect((): void => {
     (async (): Promise<void> => {
       try {
-        const assignments = await svc.getAssignmentsWhereSupervisor();
+        const [assignments, adminStatus] = await Promise.all([
+          svc.getAssignmentsWhereSupervisor(),
+          svc.isAdmin()
+        ]);
         setIsSupervisor(assignments.length > 0);
+        setIsAdmin(adminStatus);
       } catch {
-        // If error checking, assume not a supervisor
+        // If error checking, assume not a supervisor or admin
         setIsSupervisor(false);
+        setIsAdmin(false);
       } finally {
         setCheckingSupervisor(false);
       }
@@ -222,8 +229,8 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
 
   return (
     <div>
-      {/* Navigation tabs - only show if user is a supervisor */}
-      {isSupervisor && (
+      {/* Navigation tabs - show if user is a supervisor or admin */}
+      {(isSupervisor || isAdmin) && (
         <div
           style={{
             backgroundColor: "#f5f5f5",
@@ -252,22 +259,42 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
             >
               My Evaluations
             </button>
-            <button
-              onClick={(): void => setCurrentView("supervisor")}
-              style={{
-                padding: isMobile ? "8px 12px" : "10px 16px",
-                backgroundColor: currentView === "supervisor" ? "#0b6a53" : "transparent",
-                color: currentView === "supervisor" ? "#fff" : "#333",
-                border: "none",
-                borderRadius: "4px 4px 0 0",
-                cursor: "pointer",
-                fontSize: isMobile ? "0.9em" : "1em",
-                fontWeight: currentView === "supervisor" ? 600 : 400,
-                width: isMobile ? "100%" : "auto"
-              }}
-            >
-              Supervisor Dashboard
-            </button>
+            {isSupervisor && (
+              <button
+                onClick={(): void => setCurrentView("supervisor")}
+                style={{
+                  padding: isMobile ? "8px 12px" : "10px 16px",
+                  backgroundColor: currentView === "supervisor" ? "#0b6a53" : "transparent",
+                  color: currentView === "supervisor" ? "#fff" : "#333",
+                  border: "none",
+                  borderRadius: "4px 4px 0 0",
+                  cursor: "pointer",
+                  fontSize: isMobile ? "0.9em" : "1em",
+                  fontWeight: currentView === "supervisor" ? 600 : 400,
+                  width: isMobile ? "100%" : "auto"
+                }}
+              >
+                Supervisor Dashboard
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={(): void => setCurrentView("admin")}
+                style={{
+                  padding: isMobile ? "8px 12px" : "10px 16px",
+                  backgroundColor: currentView === "admin" ? "#0b6a53" : "transparent",
+                  color: currentView === "admin" ? "#fff" : "#333",
+                  border: "none",
+                  borderRadius: "4px 4px 0 0",
+                  cursor: "pointer",
+                  fontSize: isMobile ? "0.9em" : "1em",
+                  fontWeight: currentView === "admin" ? 600 : 400,
+                  width: isMobile ? "100%" : "auto"
+                }}
+              >
+                Admin
+              </button>
+            )}
           </Stack>
         </div>
       )}
@@ -275,8 +302,10 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
       {/* Main content */}
       {currentView === "pending" ? (
         <PendingAssignmentsDashboard sp={sp} />
-      ) : (
+      ) : currentView === "supervisor" ? (
         <SupervisorDashboard sp={sp} />
+      ) : (
+        <AdminDashboard service={svc} />
       )}
     </div>
   );

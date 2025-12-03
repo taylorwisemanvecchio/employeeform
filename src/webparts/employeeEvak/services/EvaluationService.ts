@@ -350,6 +350,9 @@ export class EvaluationService {
     if (role === "Supervisor") payload.SupervisorSubmitted = true;
     if (role === "Reviewer") payload.ReviewerSubmitted = true;
 
+    // Update Status to "In Progress" when at least one evaluation is submitted
+    payload.Status = "In Progress";
+
     await this.sp.web.lists
       .getByTitle(this.assignmentsList)
       .items.getById(assignmentId)
@@ -445,5 +448,98 @@ export class EvaluationService {
       .getByTitle(this.assignmentsList)
       .items.getById(assignmentId)
       .update(payload);
+  }
+
+  /**
+   * Check if the current user is an admin
+   * Only specific users can access the admin dashboard
+   */
+  public async isAdmin(): Promise<boolean> {
+    const me = await this.getCurrentUser();
+    const adminEmails = [
+      "kane@taylorwiseman.com",
+      "scimone@taylorwiseman.com",
+      "vecchioj@taylorwiseman.com"
+    ];
+    return adminEmails.some(email => email.toLowerCase() === me.Email.toLowerCase());
+  }
+
+  /**
+   * Get all evaluation assignments for admin dashboard
+   * Returns all assignments regardless of user
+   */
+  public async getAllAssignments(): Promise<IAssignment[]> {
+    const selectExpand =
+      "Id,Title,ReviewPeriodStart,ReviewPeriodEnd,Status," +
+      "SelfEvalSubmitted,SupervisorSubmitted,ReviewerSubmitted," +
+      "Employee/Id,Employee/Title,Employee/EMail," +
+      "Supervisor/Id,Supervisor/Title,Supervisor/EMail," +
+      "OptionalReviewer/Id,OptionalReviewer/Title,OptionalReviewer/EMail," +
+      "ProposedReviewer/Id,ProposedReviewer/Title,ProposedReviewer/EMail";
+
+    const items = await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.select(selectExpand)
+      .expand("Employee,Supervisor,OptionalReviewer,ProposedReviewer")
+      .top(5000)();
+
+    const rawItems = items as unknown as IRawAssignment[];
+
+    const normalizeUser = (
+      p?: { Id: number; EMail?: string; Title?: string }
+    ): IUserInfo | undefined =>
+      p && p.EMail && typeof p.Id === 'number' ? { Id: p.Id, Email: p.EMail, Title: p.Title } : undefined;
+
+    return rawItems
+      .filter((it: IRawAssignment) => {
+        return typeof it.Id === 'number';
+      })
+      .map((it: IRawAssignment): IAssignment => {
+        return {
+          Id: it.Id,
+          Title: it.Title,
+          ReviewPeriodStart: it.ReviewPeriodStart,
+          ReviewPeriodEnd: it.ReviewPeriodEnd,
+          Status: it.Status,
+          SelfEvalSubmitted: it.SelfEvalSubmitted,
+          SupervisorSubmitted: it.SupervisorSubmitted,
+          ReviewerSubmitted: it.ReviewerSubmitted,
+          Employee: normalizeUser(it.Employee),
+          Supervisor: normalizeUser(it.Supervisor),
+          OptionalReviewer: normalizeUser(it.OptionalReviewer),
+          ProposedReviewer: normalizeUser(it.ProposedReviewer)
+        };
+      });
+  }
+
+  /**
+   * Send reminders webhook to Power Automate
+   * @param webhookUrl - The Power Automate webhook URL
+   * @param incompleteAssignments - Array of assignments with incomplete evaluations
+   */
+  public async sendReminders(
+    webhookUrl: string,
+    incompleteAssignments: IAssignment[]
+  ): Promise<void> {
+    const payload = {
+      assignments: incompleteAssignments.map(a => ({
+        id: a.Id,
+        title: a.Title,
+        employee: a.Employee?.Email,
+        supervisor: a.Supervisor?.Email,
+        proposedReviewer: a.OptionalReviewer?.Email,
+        selfEvalSubmitted: a.SelfEvalSubmitted || false,
+        supervisorSubmitted: a.SupervisorSubmitted || false,
+        reviewerSubmitted: a.ReviewerSubmitted || false
+      }))
+    };
+
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
   }
 }
