@@ -91,7 +91,7 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
 
         <h2 style={{ marginTop: 0, fontSize: isMobile ? "1.2em" : "1.5em" }}>{selected.Title}</h2>
         <div style={{ marginBottom: 12, color: "#555", fontSize: isMobile ? "0.9em" : "1em" }}>
-          Role: <strong>{selected.MyRole}</strong>
+          Your Role: <strong>{selected.MyRole}</strong>
         </div>
 
         {/* ✅ removed onSubmitted prop to match component signature */}
@@ -154,7 +154,7 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
                   {a.Title}
                 </div>
                 <div style={{ fontSize: isMobile ? 11 : 12, color: "#666" }}>
-                  Role: {a.MyRole}
+                  Your Role: {a.MyRole}
                 </div>
                 {(a.ReviewPeriodStart || a.ReviewPeriodEnd) && (
                   <div style={{ fontSize: isMobile ? 11 : 12, color: "#666" }}>
