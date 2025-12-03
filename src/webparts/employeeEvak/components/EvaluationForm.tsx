@@ -59,6 +59,41 @@ export const EvaluationForm: React.FC<{
 
   const initKeyRef = React.useRef<string | undefined>(undefined);
 
+  // Helper function to scroll to top that works in SharePoint
+  const scrollToTop = (): void => {
+    // Try scrolling the window first
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Also try scrolling common SharePoint containers
+    const scrollableElements = [
+      document.querySelector('.CanvasZone'),
+      document.querySelector('[data-automation-id="contentScrollRegion"]'),
+      document.querySelector('.SPCanvas-canvas'),
+      document.documentElement,
+      document.body
+    ];
+
+    scrollableElements.forEach((element) => {
+      if (element) {
+        element.scrollTo?.({ top: 0, behavior: 'smooth' });
+        if ('scrollTop' in element) {
+          (element as HTMLElement).scrollTop = 0;
+        }
+      }
+    });
+  };
+
+  // Check if all ratings are filled
+  const areAllRatingsFilled = (): boolean => {
+    const cats = CATEGORIES as ICategoryDef[];
+    return cats.every((cat: ICategoryDef) =>
+      cat.questions.every((q: IQuestionDef) => {
+        const rating = response?.[q.key];
+        return typeof rating === "number" || (typeof rating === "string" && rating !== "");
+      })
+    );
+  };
+
   // Detect mobile viewport
   React.useEffect((): (() => void) => {
     const checkMobile = (): void => {
@@ -131,6 +166,12 @@ export const EvaluationForm: React.FC<{
 
   const onSave = async (submit = false): Promise<void> => {
     if (!response) return;
+
+    // Validate that all ratings are filled before submission
+    if (submit && !areAllRatingsFilled()) {
+      alert("Please complete all rating fields before submitting.");
+      return;
+    }
 
     try {
       setSaving(true);
@@ -264,7 +305,7 @@ export const EvaluationForm: React.FC<{
             key={c.name}
             onClick={(): void => {
               setCategoryIdx(i);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              scrollToTop();
             }}
             style={{
               padding: "10px 12px",
@@ -325,6 +366,7 @@ export const EvaluationForm: React.FC<{
                 <div style={{ width: isMobile ? "100%" : 280 }}>
                   <ChoiceGroup
                     label="My Rating"
+                    required={true}
                     options={ratingOptions}
                     selectedKey={selectedKey?.toString()}
                     onChange={(_, opt): void => {
@@ -381,7 +423,7 @@ export const EvaluationForm: React.FC<{
               text="Next Section"
               onClick={(): void => {
                 setCategoryIdx(categoryIdx + 1);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                scrollToTop();
               }}
               disabled={saving}
               styles={{ root: { width: isMobile ? "100%" : "auto" } }}
@@ -392,7 +434,7 @@ export const EvaluationForm: React.FC<{
               onClick={(): void => {
                 onSave(true).catch((): void => {});
               }}
-              disabled={saving}
+              disabled={saving || !areAllRatingsFilled()}
               styles={{ root: { width: isMobile ? "100%" : "auto" } }}
             />
           )}
