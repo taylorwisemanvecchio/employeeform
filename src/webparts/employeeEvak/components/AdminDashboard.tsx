@@ -33,6 +33,9 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
   const [sendingReminders, setSendingReminders] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [showWebhookInput, setShowWebhookInput] = useState(false);
+  const [sendingGoLive, setSendingGoLive] = useState(false);
+  const [goLiveWebhookUrl, setGoLiveWebhookUrl] = useState("");
+  const [showGoLiveWebhookInput, setShowGoLiveWebhookInput] = useState(false);
 
   const loadAssignments = React.useCallback(async (): Promise<void> => {
     try {
@@ -189,6 +192,25 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
     }
   };
 
+  const handleSendGoLive = async (): Promise<void> => {
+    if (!goLiveWebhookUrl) {
+      setShowGoLiveWebhookInput(true);
+      return;
+    }
+
+    try {
+      setSendingGoLive(true);
+      await service.sendGoLive(goLiveWebhookUrl, incompleteAssignments);
+      alert(`Go Live sent successfully to ${incompleteAssignments.length} incomplete evaluations!`);
+      setShowGoLiveWebhookInput(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to send go live";
+      alert(`Error sending go live: ${errorMessage}`);
+    } finally {
+      setSendingGoLive(false);
+    }
+  };
+
   if (loading) {
     return <div className={styles.container}>Loading admin dashboard...</div>;
   }
@@ -317,6 +339,34 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
               Send
             </button>
             <button onClick={() => setShowWebhookInput(false)} className={styles.buttonSecondary}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Go Live Section */}
+      <div className={styles.reminderSection}>
+        <button
+          onClick={handleSendGoLive}
+          disabled={sendingGoLive || incompleteAssignments.length === 0}
+          className={styles.reminderButton}
+        >
+          {sendingGoLive ? "Sending..." : `Go Live (${incompleteAssignments.length} incomplete)`}
+        </button>
+        {showGoLiveWebhookInput && (
+          <div className={styles.webhookInput}>
+            <input
+              type="text"
+              placeholder="Enter Power Automate webhook URL for Go Live"
+              value={goLiveWebhookUrl}
+              onChange={(e) => setGoLiveWebhookUrl(e.target.value)}
+              className={styles.input}
+            />
+            <button onClick={handleSendGoLive} className={styles.button}>
+              Send
+            </button>
+            <button onClick={() => setShowGoLiveWebhookInput(false)} className={styles.buttonSecondary}>
               Cancel
             </button>
           </div>
