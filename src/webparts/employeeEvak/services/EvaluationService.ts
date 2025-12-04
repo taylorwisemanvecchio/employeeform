@@ -525,10 +525,10 @@ export class EvaluationService {
       assignments: incompleteAssignments.map(a => ({
         id: a.Id,
         title: a.Title,
-        employee: a.Employee?.Email ?? null,
-        supervisor: a.Supervisor?.Email ?? null,
-        optionalReviewer: a.OptionalReviewer?.Email ?? null,
-        proposedReviewer: a.ProposedReviewer?.Email ?? null,
+        ...(a.Employee?.Email && { employee: a.Employee.Email }),
+        ...(a.Supervisor?.Email && { supervisor: a.Supervisor.Email }),
+        ...(a.OptionalReviewer?.Email && { optionalReviewer: a.OptionalReviewer.Email }),
+        ...(a.ProposedReviewer?.Email && { proposedReviewer: a.ProposedReviewer.Email }),
         selfEvalSubmitted: a.SelfEvalSubmitted || false,
         supervisorSubmitted: a.SupervisorSubmitted || false,
         reviewerSubmitted: a.ReviewerSubmitted || false
@@ -562,10 +562,10 @@ export class EvaluationService {
       assignments: incompleteAssignments.map(a => ({
         id: a.Id,
         title: a.Title,
-        employee: a.Employee?.Email ?? null,
-        supervisor: a.Supervisor?.Email ?? null,
-        optionalReviewer: a.OptionalReviewer?.Email ?? null,
-        proposedReviewer: a.ProposedReviewer?.Email ?? null,
+        ...(a.Employee?.Email && { employee: a.Employee.Email }),
+        ...(a.Supervisor?.Email && { supervisor: a.Supervisor.Email }),
+        ...(a.OptionalReviewer?.Email && { optionalReviewer: a.OptionalReviewer.Email }),
+        ...(a.ProposedReviewer?.Email && { proposedReviewer: a.ProposedReviewer.Email }),
         selfEvalSubmitted: a.SelfEvalSubmitted || false,
         supervisorSubmitted: a.SupervisorSubmitted || false,
         reviewerSubmitted: a.ReviewerSubmitted || false
