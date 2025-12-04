@@ -527,7 +527,38 @@ export class EvaluationService {
         title: a.Title,
         employee: a.Employee?.Email,
         supervisor: a.Supervisor?.Email,
-        proposedReviewer: a.OptionalReviewer?.Email,
+        optionalReviewer: a.OptionalReviewer?.Email,
+        selfEvalSubmitted: a.SelfEvalSubmitted || false,
+        supervisorSubmitted: a.SupervisorSubmitted || false,
+        reviewerSubmitted: a.ReviewerSubmitted || false
+      }))
+    };
+
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  /**
+   * Send go live webhook to Power Automate
+   * @param webhookUrl - The Power Automate webhook URL
+   * @param incompleteAssignments - Array of assignments with incomplete evaluations
+   */
+  public async sendGoLive(
+    webhookUrl: string,
+    incompleteAssignments: IAssignment[]
+  ): Promise<void> {
+    const payload = {
+      assignments: incompleteAssignments.map(a => ({
+        id: a.Id,
+        title: a.Title,
+        employee: a.Employee?.Email,
+        supervisor: a.Supervisor?.Email,
+        optionalReviewer: a.OptionalReviewer?.Email,
         selfEvalSubmitted: a.SelfEvalSubmitted || false,
         supervisorSubmitted: a.SupervisorSubmitted || false,
         reviewerSubmitted: a.ReviewerSubmitted || false
