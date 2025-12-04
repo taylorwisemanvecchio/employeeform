@@ -186,7 +186,7 @@ export default function SupervisorDashboard(props: ISupervisorDashboardProps): R
                   {/* Action Button - Only show if there's a proposed reviewer */}
                   {hasProposedReviewer && (
                     <PrimaryButton
-                      text="Add Optional Approver"
+                      text="Add Additional Reviewer"
                       disabled={isUpdating}
                       onClick={(): void => {
                         if (confirm(`Add ${a.ProposedReviewer?.Title} as optional approver?`)) {
