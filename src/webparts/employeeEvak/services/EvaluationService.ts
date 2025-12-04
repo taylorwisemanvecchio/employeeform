@@ -535,13 +535,18 @@ export class EvaluationService {
       }))
     };
 
-    await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Webhook request failed with status ${response.status}: ${errorText || response.statusText}`);
+    }
   }
 
   /**
@@ -567,12 +572,17 @@ export class EvaluationService {
       }))
     };
 
-    await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Webhook request failed with status ${response.status}: ${errorText || response.statusText}`);
+    }
   }
 }
