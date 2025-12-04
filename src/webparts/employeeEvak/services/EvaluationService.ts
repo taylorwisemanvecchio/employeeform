@@ -528,6 +528,7 @@ export class EvaluationService {
         employee: a.Employee?.Email,
         supervisor: a.Supervisor?.Email,
         optionalReviewer: a.OptionalReviewer?.Email,
+        proposedReviewer: a.ProposedReviewer?.Email,
         selfEvalSubmitted: a.SelfEvalSubmitted || false,
         supervisorSubmitted: a.SupervisorSubmitted || false,
         reviewerSubmitted: a.ReviewerSubmitted || false
@@ -559,6 +560,7 @@ export class EvaluationService {
         employee: a.Employee?.Email,
         supervisor: a.Supervisor?.Email,
         optionalReviewer: a.OptionalReviewer?.Email,
+        proposedReviewer: a.ProposedReviewer?.Email,
         selfEvalSubmitted: a.SelfEvalSubmitted || false,
         supervisorSubmitted: a.SupervisorSubmitted || false,
         reviewerSubmitted: a.ReviewerSubmitted || false
