@@ -308,7 +308,7 @@ export class EvaluationService {
             me.Email.replace("'", "''") +
             "'"
         )
-        .select("Id,Title,AssignmentIDId,ReviewerType,SubmittedDate,ReviewerName/Id,ReviewerName/EMail")
+        .select("Id,Title,AssignmentIDId,ReviewerType,SubmittedDate,*,ReviewerName/Id,ReviewerName/EMail")
         .expand("ReviewerName")
         .top(1)();
 
