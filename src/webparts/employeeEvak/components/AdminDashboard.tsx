@@ -263,6 +263,8 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
 
     try {
       setSendingRejection(true);
+
+      // Send rejection webhook to Power Automate
       await service.sendRejection(
         rejectionWebhookUrl,
         selectedAssignment,
@@ -271,8 +273,20 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
         rejectSupervisor,
         rejectReviewer
       );
+
+      // Update submission flags and status in SharePoint
+      await service.updateRejectedSubmissions(
+        selectedAssignment.Id,
+        rejectEmployee,
+        rejectSupervisor,
+        rejectReviewer
+      );
+
       alert("Rejection sent successfully!");
       handleCloseRejectDialog();
+
+      // Reload assignments to reflect the changes
+      await loadAssignments();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to send rejection";
       alert(`Error sending rejection: ${errorMessage}`);

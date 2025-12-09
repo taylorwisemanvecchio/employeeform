@@ -630,4 +630,39 @@ export class EvaluationService {
       throw new Error(`Rejection webhook failed with status ${response.status}: ${errorText || response.statusText}`);
     }
   }
+
+  /**
+   * Update assignment submission flags after rejection
+   * @param assignmentId - The assignment ID to update
+   * @param rejectEmployee - Whether to reset employee submission flag
+   * @param rejectSupervisor - Whether to reset supervisor submission flag
+   * @param rejectReviewer - Whether to reset reviewer submission flag
+   */
+  public async updateRejectedSubmissions(
+    assignmentId: number,
+    rejectEmployee: boolean,
+    rejectSupervisor: boolean,
+    rejectReviewer: boolean
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {};
+
+    // First, update the submission flags based on what was rejected
+    if (rejectEmployee) {
+      payload.SelfEvalSubmitted = false;
+    }
+    if (rejectSupervisor) {
+      payload.SupervisorSubmitted = false;
+    }
+    if (rejectReviewer) {
+      payload.ReviewerSubmitted = false;
+    }
+
+    // Then update the status to In Progress
+    payload.Status = "In Progress";
+
+    await this.sp.web.lists
+      .getByTitle(this.assignmentsList)
+      .items.getById(assignmentId)
+      .update(payload);
+  }
 }
