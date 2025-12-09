@@ -585,4 +585,49 @@ export class EvaluationService {
       throw new Error(`Webhook request failed with status ${response.status}: ${errorText || response.statusText}`);
     }
   }
+
+  /**
+   * Send rejection webhook to Power Automate
+   * @param webhookUrl - The Power Automate webhook URL
+   * @param assignment - The assignment being rejected
+   * @param rejectionReason - The reason for rejection
+   * @param rejectEmployee - Whether to reject the employee's submission
+   * @param rejectSupervisor - Whether to reject the supervisor's submission
+   * @param rejectReviewer - Whether to reject the reviewer's submission
+   */
+  public async sendRejection(
+    webhookUrl: string,
+    assignment: IAssignment,
+    rejectionReason: string,
+    rejectEmployee: boolean,
+    rejectSupervisor: boolean,
+    rejectReviewer: boolean
+  ): Promise<void> {
+    const payload = {
+      assignmentId: assignment.Id,
+      assignmentTitle: assignment.Title,
+      rejectionReason: rejectionReason,
+      rejectedSubmitters: {
+        employee: rejectEmployee,
+        supervisor: rejectSupervisor,
+        reviewer: rejectReviewer
+      },
+      ...(assignment.Employee?.Email && { employeeEmail: assignment.Employee.Email }),
+      ...(assignment.Supervisor?.Email && { supervisorEmail: assignment.Supervisor.Email }),
+      ...(assignment.OptionalReviewer?.Email && { reviewerEmail: assignment.OptionalReviewer.Email })
+    };
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Rejection webhook failed with status ${response.status}: ${errorText || response.statusText}`);
+    }
+  }
 }

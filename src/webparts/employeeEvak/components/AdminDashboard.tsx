@@ -2,6 +2,15 @@ import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { EvaluationService, IAssignment } from "../services/EvaluationService";
 import styles from "./EmployeeEvak.module.scss";
+import {
+  Dialog,
+  DialogType,
+  DialogFooter,
+  PrimaryButton,
+  DefaultButton,
+  TextField,
+  Checkbox
+} from "@fluentui/react";
 
 interface IAdminDashboardProps {
   service: EvaluationService;
@@ -36,6 +45,16 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
   const [sendingGoLive, setSendingGoLive] = useState(false);
   const [goLiveWebhookUrl, setGoLiveWebhookUrl] = useState("");
   const [showGoLiveWebhookInput, setShowGoLiveWebhookInput] = useState(false);
+
+  // Rejection dialog state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<IAssignment | undefined>();
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectEmployee, setRejectEmployee] = useState(false);
+  const [rejectSupervisor, setRejectSupervisor] = useState(false);
+  const [rejectReviewer, setRejectReviewer] = useState(false);
+  const [sendingRejection, setSendingRejection] = useState(false);
+  const rejectionWebhookUrl = "https://defaultdbf39b203d1a468094f8b0aade3398.82.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/35615e9615d745828af325e55871ab7b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=65ifFfq4dvZMXpSv06DXM9Z3cYUfWWulFRwvLCTRViA";
 
   const loadAssignments = React.useCallback(async (): Promise<void> => {
     try {
@@ -208,6 +227,57 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
       alert(`Error sending go live: ${errorMessage}`);
     } finally {
       setSendingGoLive(false);
+    }
+  };
+
+  const handleOpenRejectDialog = (assignment: IAssignment): void => {
+    setSelectedAssignment(assignment);
+    setRejectionReason("");
+    setRejectEmployee(false);
+    setRejectSupervisor(false);
+    setRejectReviewer(false);
+    setShowRejectDialog(true);
+  };
+
+  const handleCloseRejectDialog = (): void => {
+    setShowRejectDialog(false);
+    setSelectedAssignment(undefined);
+    setRejectionReason("");
+    setRejectEmployee(false);
+    setRejectSupervisor(false);
+    setRejectReviewer(false);
+  };
+
+  const handleSendRejection = async (): Promise<void> => {
+    if (!selectedAssignment) return;
+
+    if (!rejectionReason.trim()) {
+      alert("Please provide a reason for rejection");
+      return;
+    }
+
+    if (!rejectEmployee && !rejectSupervisor && !rejectReviewer) {
+      alert("Please select at least one submitter to reject");
+      return;
+    }
+
+    try {
+      setSendingRejection(true);
+      await service.sendRejection(
+        rejectionWebhookUrl,
+        selectedAssignment,
+        rejectionReason,
+        rejectEmployee,
+        rejectSupervisor,
+        rejectReviewer
+      );
+      alert("Rejection sent successfully!");
+      handleCloseRejectDialog();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to send rejection";
+      alert(`Error sending rejection: ${errorMessage}`);
+    } finally {
+      setSendingRejection(false);
     }
   };
 
@@ -422,65 +492,145 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
               <th>Proposed Reviewer</th>
               <th>Reviewer Added</th>
               <th>Reviewer Submitted</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={9} className={styles.noResults}>
+                <td colSpan={10} className={styles.noResults}>
                   No evaluations found matching your criteria
                 </td>
               </tr>
             ) : (
-              filteredRows.map(row => (
-                <tr key={row.id}>
-                  <td>{row.title}</td>
-                  <td>
-                    <span className={styles.statusBadge}>
-                      {row.status}
-                    </span>
-                  </td>
-                  <td title={row.employeeEmail}>{row.employeeName}</td>
-                  <td className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      checked={row.employeeSubmitted}
-                      disabled
-                      readOnly
-                    />
-                  </td>
-                  <td title={row.supervisorEmail}>{row.supervisorName}</td>
-                  <td className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      checked={row.supervisorSubmitted}
-                      disabled
-                      readOnly
-                    />
-                  </td>
-                  <td title={row.proposedReviewerEmail}>{row.proposedReviewerName}</td>
-                  <td className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      checked={row.proposedReviewerAdded}
-                      disabled
-                      readOnly
-                    />
-                  </td>
-                  <td className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      checked={row.proposedReviewerSubmitted}
-                      disabled
-                      readOnly
-                    />
-                  </td>
-                </tr>
-              ))
+              filteredRows.map(row => {
+                const assignment = assignments.find(a => a.Id === row.id);
+                return (
+                  <tr key={row.id}>
+                    <td>{row.title}</td>
+                    <td>
+                      <span className={styles.statusBadge}>
+                        {row.status}
+                      </span>
+                    </td>
+                    <td title={row.employeeEmail}>{row.employeeName}</td>
+                    <td className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        checked={row.employeeSubmitted}
+                        disabled
+                        readOnly
+                      />
+                    </td>
+                    <td title={row.supervisorEmail}>{row.supervisorName}</td>
+                    <td className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        checked={row.supervisorSubmitted}
+                        disabled
+                        readOnly
+                      />
+                    </td>
+                    <td title={row.proposedReviewerEmail}>{row.proposedReviewerName}</td>
+                    <td className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        checked={row.proposedReviewerAdded}
+                        disabled
+                        readOnly
+                      />
+                    </td>
+                    <td className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        checked={row.proposedReviewerSubmitted}
+                        disabled
+                        readOnly
+                      />
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => assignment && handleOpenRejectDialog(assignment)}
+                        className={styles.rejectButton}
+                        disabled={!assignment}
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Rejection Dialog */}
+      <Dialog
+        hidden={!showRejectDialog}
+        onDismiss={handleCloseRejectDialog}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: 'Reject Evaluation',
+          subText: selectedAssignment ? `Assignment: ${selectedAssignment.Title}` : ''
+        }}
+        modalProps={{
+          isBlocking: true
+        }}
+      >
+        <TextField
+          label="Reason for Rejection"
+          multiline
+          rows={4}
+          required
+          value={rejectionReason}
+          onChange={(_, newValue) => setRejectionReason(newValue || "")}
+          placeholder="Please provide a detailed reason for the rejection..."
+        />
+
+        <div style={{ marginTop: 16 }}>
+          <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>
+            Select submitters to reject:
+          </label>
+          {selectedAssignment?.Employee && (
+            <Checkbox
+              label={`Employee: ${selectedAssignment.Employee.Title || selectedAssignment.Employee.Email}`}
+              checked={rejectEmployee}
+              onChange={(_, checked) => setRejectEmployee(checked || false)}
+              disabled={!selectedAssignment.SelfEvalSubmitted}
+            />
+          )}
+          {selectedAssignment?.Supervisor && (
+            <Checkbox
+              label={`Supervisor: ${selectedAssignment.Supervisor.Title || selectedAssignment.Supervisor.Email}`}
+              checked={rejectSupervisor}
+              onChange={(_, checked) => setRejectSupervisor(checked || false)}
+              disabled={!selectedAssignment.SupervisorSubmitted}
+            />
+          )}
+          {selectedAssignment?.OptionalReviewer && (
+            <Checkbox
+              label={`Reviewer: ${selectedAssignment.OptionalReviewer.Title || selectedAssignment.OptionalReviewer.Email}`}
+              checked={rejectReviewer}
+              onChange={(_, checked) => setRejectReviewer(checked || false)}
+              disabled={!selectedAssignment.ReviewerSubmitted}
+            />
+          )}
+        </div>
+
+        <DialogFooter>
+          <PrimaryButton
+            onClick={handleSendRejection}
+            text="Send Rejection"
+            disabled={sendingRejection}
+          />
+          <DefaultButton
+            onClick={handleCloseRejectDialog}
+            text="Cancel"
+            disabled={sendingRejection}
+          />
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 };
