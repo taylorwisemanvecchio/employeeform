@@ -504,7 +504,14 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
               </tr>
             ) : (
               filteredRows.map(row => {
-                const assignment = assignments.find(a => a.Id === row.id);
+                // ES5-compatible find alternative
+                let assignment: IAssignment | undefined;
+                for (let i = 0; i < assignments.length; i++) {
+                  if (assignments[i].Id === row.id) {
+                    assignment = assignments[i];
+                    break;
+                  }
+                }
                 return (
                   <tr key={row.id}>
                     <td>{row.title}</td>
@@ -551,8 +558,16 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
                     <td>
                       <button
                         onClick={() => assignment && handleOpenRejectDialog(assignment)}
-                        className={styles.rejectButton}
+                        className={styles.button}
                         disabled={!assignment}
+                        style={{
+                          backgroundColor: '#d13438',
+                          color: 'white',
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          cursor: assignment ? 'pointer' : 'not-allowed'
+                        }}
                       >
                         Reject
                       </button>

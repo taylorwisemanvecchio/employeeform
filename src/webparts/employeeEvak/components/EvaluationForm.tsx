@@ -16,8 +16,6 @@ import {
 } from "../services/EvaluationService";
 import { CATEGORIES } from "../data/questions";
 
-type Likert = 1 | 2 | 3 | 4;
-
 interface IQuestionDef {
   key: string;
   commentKey: string;
