@@ -56,6 +56,11 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
   const [sendingRejection, setSendingRejection] = useState(false);
   const rejectionWebhookUrl = "https://defaultdbf39b203d1a468094f8b0aade3398.82.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/35615e9615d745828af325e55871ab7b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=65ifFfq4dvZMXpSv06DXM9Z3cYUfWWulFRwvLCTRViA";
 
+  // Refs for sticky scrollbar synchronization
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const stickyScrollRef = React.useRef<HTMLDivElement>(null);
+  const stickyScrollInnerRef = React.useRef<HTMLDivElement>(null);
+
   const loadAssignments = React.useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
@@ -75,6 +80,50 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
       // Error is handled in loadAssignments
     });
   }, [loadAssignments]);
+
+  // Sync sticky scrollbar with table container
+  useEffect(() => {
+    const tableContainer = tableContainerRef.current;
+    const stickyScroll = stickyScrollRef.current;
+    const stickyScrollInner = stickyScrollInnerRef.current;
+
+    if (!tableContainer || !stickyScroll || !stickyScrollInner) return;
+
+    // Set the width of the sticky scroll inner to match the table's scroll width
+    const updateStickyScrollWidth = (): void => {
+      stickyScrollInner.style.width = tableContainer.scrollWidth + "px";
+    };
+
+    // Sync scroll positions
+    const handleTableScroll = (): void => {
+      if (stickyScroll) {
+        stickyScroll.scrollLeft = tableContainer.scrollLeft;
+      }
+    };
+
+    const handleStickyScroll = (): void => {
+      if (tableContainer) {
+        tableContainer.scrollLeft = stickyScroll.scrollLeft;
+      }
+    };
+
+    // Initial setup
+    updateStickyScrollWidth();
+
+    // Add event listeners
+    tableContainer.addEventListener('scroll', handleTableScroll);
+    stickyScroll.addEventListener('scroll', handleStickyScroll);
+
+    // Update on window resize
+    window.addEventListener('resize', updateStickyScrollWidth);
+
+    // Cleanup
+    return (): void => {
+      tableContainer.removeEventListener('scroll', handleTableScroll);
+      stickyScroll.removeEventListener('scroll', handleStickyScroll);
+      window.removeEventListener('resize', updateStickyScrollWidth);
+    };
+  }, [filteredRows]); // Re-run when data changes
 
   // Transform assignments into admin rows
   const adminRows: IAdminRow[] = useMemo(() => {
@@ -492,8 +541,25 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
         Showing {filteredRows.length} of {adminRows.length} evaluations
       </div>
 
+      {/* Sticky Horizontal Scrollbar */}
+      <div
+        ref={stickyScrollRef}
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          marginBottom: 8,
+          backgroundColor: '#f3f2f1',
+          borderRadius: 4
+        }}
+      >
+        <div ref={stickyScrollInnerRef} style={{ height: 1 }} />
+      </div>
+
       {/* Data Table */}
-      <div className={styles.tableContainer}>
+      <div ref={tableContainerRef} className={styles.tableContainer}>
         <table className={styles.adminTable}>
           <thead>
             <tr>
