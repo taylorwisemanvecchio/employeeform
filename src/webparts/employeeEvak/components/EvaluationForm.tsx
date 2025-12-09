@@ -333,7 +333,11 @@ export const EvaluationForm: React.FC<{
         {cat.questions.map((q: IQuestionDef) => {
           const ratingVal = response[q.key];
           const selectedKey =
-            typeof ratingVal === "number" ? (ratingVal as Likert) : undefined;
+            typeof ratingVal === "number"
+              ? ratingVal.toString()
+              : typeof ratingVal === "string"
+                ? ratingVal
+                : undefined;
 
           const commentVal = response[q.commentKey];
           const commentText =
