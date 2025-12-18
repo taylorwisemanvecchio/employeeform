@@ -2,8 +2,17 @@ import { SPFI } from "@pnp/sp";
 import "@pnp/sp/items";
 import "@pnp/sp/lists";
 import "@pnp/sp/site-users/web";
+import { WebPartContext } from "@microsoft/sp-webpart-base";
+import { MSGraphClientV3 } from "@microsoft/sp-http";
 
 export type ReviewerType = "Employee" | "Supervisor" | "Reviewer";
+
+export interface IDepartmentManager {
+  Id: number;
+  Manager?: IUserInfo;
+  Office: string;
+  Department: string;
+}
 
 export interface IUserInfo {
   Id: number;
@@ -61,8 +70,9 @@ interface IRawAssignment {
 export class EvaluationService {
   private assignmentsList = "EvaluationAssignments";
   private responsesList = "EvaluationResponses";
+  private departmentManagersList = "DepartmentManagers";
 
-  constructor(private sp: SPFI) {}
+  constructor(private sp: SPFI, private context?: WebPartContext) {}
 
   public async getCurrentUser(): Promise<IUserInfo> {
     // Retry logic with exponential backoff for SharePoint context initialization
@@ -664,5 +674,159 @@ export class EvaluationService {
       .getByTitle(this.assignmentsList)
       .items.getById(assignmentId)
       .update(payload);
+  }
+
+  /**
+   * Get all department managers from the DepartmentManagers list
+   */
+  public async getDepartmentManagers(): Promise<IDepartmentManager[]> {
+    try {
+      const items = await this.sp.web.lists
+        .getByTitle(this.departmentManagersList)
+        .items.select(
+          "Id,Office,Department," +
+          "Manager/Id,Manager/Title,Manager/EMail"
+        )
+        .expand("Manager")();
+
+      const rawItems = items as Array<{
+        Id: number;
+        Office: string;
+        Department: string;
+        Manager?: { Id: number; EMail?: string; Title?: string };
+      }>;
+
+      return rawItems.map(item => ({
+        Id: item.Id,
+        Office: item.Office || "",
+        Department: item.Department || "",
+        Manager: item.Manager && item.Manager.EMail && typeof item.Manager.Id === 'number'
+          ? { Id: item.Manager.Id, Email: item.Manager.EMail, Title: item.Manager.Title }
+          : undefined
+      }));
+    } catch (error) {
+      console.error("Error fetching department managers:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if the current user is a department manager
+   * Returns the manager record if they are, undefined otherwise
+   */
+  public async isDepartmentManager(): Promise<IDepartmentManager | undefined> {
+    const me = await this.getCurrentUser();
+    const managers = await this.getDepartmentManagers();
+
+    // ES5-compatible find
+    for (let i = 0; i < managers.length; i++) {
+      const m = managers[i];
+      if (m.Manager && m.Manager.Email.toLowerCase() === me.Email.toLowerCase()) {
+        return m;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Check if a specific email has "view all" access
+   */
+  private hasViewAllAccess(email: string): boolean {
+    const viewAllEmails = ["vecchioj@taylorwiseman.com"];
+    return viewAllEmails.some(e => e.toLowerCase() === email.toLowerCase());
+  }
+
+  /**
+   * Get employee department from Microsoft Graph API
+   * @param email - The email of the employee
+   */
+  public async getEmployeeDepartment(email: string): Promise<string | undefined> {
+    if (!this.context) {
+      console.warn("Context not available for Microsoft Graph API calls");
+      return undefined;
+    }
+
+    try {
+      const graphClient: MSGraphClientV3 = await this.context.msGraphClientFactory.getClient("3");
+      const user = await graphClient
+        .api(`/users/${email}`)
+        .select("department,officeLocation")
+        .get();
+
+      return user?.department;
+    } catch (error) {
+      console.error(`Error fetching department for ${email}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get employee office location from Microsoft Graph API
+   * @param email - The email of the employee
+   */
+  public async getEmployeeOffice(email: string): Promise<string | undefined> {
+    if (!this.context) {
+      console.warn("Context not available for Microsoft Graph API calls");
+      return undefined;
+    }
+
+    try {
+      const graphClient: MSGraphClientV3 = await this.context.msGraphClientFactory.getClient("3");
+      const user = await graphClient
+        .api(`/users/${email}`)
+        .select("officeLocation")
+        .get();
+
+      return user?.officeLocation;
+    } catch (error) {
+      console.error(`Error fetching office for ${email}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get assignments filtered for a department manager
+   * Only returns assignments for employees in the manager's department and office
+   */
+  public async getAssignmentsForDepartmentManager(): Promise<IAssignment[]> {
+    const me = await this.getCurrentUser();
+
+    // Check for view all access
+    if (this.hasViewAllAccess(me.Email)) {
+      return this.getAllAssignments();
+    }
+
+    const managerRecord = await this.isDepartmentManager();
+    if (!managerRecord) {
+      return [];
+    }
+
+    // Get all assignments
+    const allAssignments = await this.getAllAssignments();
+
+    // Filter assignments by checking each employee's department and office
+    const filteredAssignments: IAssignment[] = [];
+
+    for (const assignment of allAssignments) {
+      if (!assignment.Employee?.Email) continue;
+
+      // Fetch employee's department and office from Graph API
+      const [empDepartment, empOffice] = await Promise.all([
+        this.getEmployeeDepartment(assignment.Employee.Email),
+        this.getEmployeeOffice(assignment.Employee.Email)
+      ]);
+
+      // Compare with manager's department and office
+      const deptMatch = empDepartment &&
+        empDepartment.toLowerCase() === managerRecord.Department.toLowerCase();
+      const officeMatch = empOffice &&
+        empOffice.toLowerCase() === managerRecord.Office.toLowerCase();
+
+      if (deptMatch && officeMatch) {
+        filteredAssignments.push(assignment);
+      }
+    }
+
+    return filteredAssignments;
   }
 }

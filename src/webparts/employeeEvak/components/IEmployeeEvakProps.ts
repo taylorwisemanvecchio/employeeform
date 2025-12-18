@@ -1,11 +1,5 @@
-export interface IEmployeeEvakProps {
-  description: string;
-  isDarkTheme: boolean;
-  environmentMessage: string;
-  hasTeamsContext: boolean;
-  userDisplayName: string;
-}
 import { SPFI } from "@pnp/sp";
+import { WebPartContext } from "@microsoft/sp-webpart-base";
 
 export interface IEmployeeEvakProps {
   description: string;
@@ -16,4 +10,5 @@ export interface IEmployeeEvakProps {
 
   // ⭐ NEW
   sp: SPFI;
+  context: WebPartContext;
 }

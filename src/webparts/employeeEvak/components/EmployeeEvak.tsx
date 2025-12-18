@@ -6,12 +6,13 @@ import { EvaluationService, IPendingAssignment } from "../services/EvaluationSer
 import EvaluationForm from "./EvaluationForm";
 import SupervisorDashboard from "./SupervisorDashboard";
 import { AdminDashboard } from "./AdminDashboard";
+import { ManagerDashboard } from "./ManagerDashboard";
 import { PrimaryButton, DefaultButton, Stack } from "@fluentui/react";
 
 // Hoisted function avoids no-use-before-define
-function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
-  const { sp } = props;
-  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp), [sp]);
+function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"]; context: IEmployeeEvakProps["context"] }): React.ReactElement {
+  const { sp, context } = props;
+  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp, context), [sp, context]);
 
   const [pending, setPending] = React.useState<IPendingAssignment[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
@@ -100,6 +101,7 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
           assignmentId={selected.Id}
           reviewerType={selected.MyRole}
           key={`${selected.Id}|${selected.MyRole}`}
+          context={context}
         />
       </div>
     );
@@ -180,15 +182,16 @@ function PendingAssignmentsDashboard(props: { sp: IEmployeeEvakProps["sp"] }): R
   );
 }
 
-type ViewType = "pending" | "supervisor" | "admin";
+type ViewType = "pending" | "supervisor" | "admin" | "manager";
 
-function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
-  const { sp } = props;
-  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp), [sp]);
+function MainApp(props: { sp: IEmployeeEvakProps["sp"]; context: IEmployeeEvakProps["context"] }): React.ReactElement {
+  const { sp, context } = props;
+  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp, context), [sp, context]);
 
   const [currentView, setCurrentView] = React.useState<ViewType>("pending");
   const [isSupervisor, setIsSupervisor] = React.useState<boolean>(false);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+  const [isDepartmentManager, setIsDepartmentManager] = React.useState<boolean>(false);
   const [checkingSupervisor, setCheckingSupervisor] = React.useState<boolean>(true);
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
 
@@ -203,20 +206,23 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
     return (): void => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Check if current user is a supervisor and/or admin
+  // Check if current user is a supervisor, admin, and/or department manager
   React.useEffect((): void => {
     (async (): Promise<void> => {
       try {
-        const [assignments, adminStatus] = await Promise.all([
+        const [assignments, adminStatus, deptManagerRecord] = await Promise.all([
           svc.getAssignmentsWhereSupervisor(),
-          svc.isAdmin()
+          svc.isAdmin(),
+          svc.isDepartmentManager()
         ]);
         setIsSupervisor(assignments.length > 0);
         setIsAdmin(adminStatus);
+        setIsDepartmentManager(!!deptManagerRecord);
       } catch {
-        // If error checking, assume not a supervisor or admin
+        // If error checking, assume not a supervisor, admin, or department manager
         setIsSupervisor(false);
         setIsAdmin(false);
+        setIsDepartmentManager(false);
       } finally {
         setCheckingSupervisor(false);
       }
@@ -229,8 +235,8 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
 
   return (
     <div>
-      {/* Navigation tabs - show if user is a supervisor or admin */}
-      {(isSupervisor || isAdmin) && (
+      {/* Navigation tabs - show if user is a supervisor, admin, or department manager */}
+      {(isSupervisor || isAdmin || isDepartmentManager) && (
         <div
           style={{
             backgroundColor: "#f5f5f5",
@@ -277,6 +283,24 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
                 Supervisor Dashboard
               </button>
             )}
+            {isDepartmentManager && (
+              <button
+                onClick={(): void => setCurrentView("manager")}
+                style={{
+                  padding: isMobile ? "8px 12px" : "10px 16px",
+                  backgroundColor: currentView === "manager" ? "#0b6a53" : "transparent",
+                  color: currentView === "manager" ? "#fff" : "#333",
+                  border: "none",
+                  borderRadius: "4px 4px 0 0",
+                  cursor: "pointer",
+                  fontSize: isMobile ? "0.9em" : "1em",
+                  fontWeight: currentView === "manager" ? 600 : 400,
+                  width: isMobile ? "100%" : "auto"
+                }}
+              >
+                Manager Dashboard
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={(): void => setCurrentView("admin")}
@@ -301,9 +325,11 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
 
       {/* Main content */}
       {currentView === "pending" ? (
-        <PendingAssignmentsDashboard sp={sp} />
+        <PendingAssignmentsDashboard sp={sp} context={context} />
       ) : currentView === "supervisor" ? (
-        <SupervisorDashboard sp={sp} />
+        <SupervisorDashboard sp={sp} context={context} />
+      ) : currentView === "manager" ? (
+        <ManagerDashboard service={svc} />
       ) : (
         <AdminDashboard service={svc} />
       )}
@@ -313,11 +339,11 @@ function MainApp(props: { sp: IEmployeeEvakProps["sp"] }): React.ReactElement {
 
 export default class EmployeeEvak extends React.Component<IEmployeeEvakProps> {
   public render(): React.ReactElement<IEmployeeEvakProps> {
-    const { sp, hasTeamsContext } = this.props;
+    const { sp, hasTeamsContext, context } = this.props;
 
     return (
       <section className={`${styles.employeeEvak} ${hasTeamsContext ? styles.teams : ""}`}>
-        <MainApp sp={sp} />
+        <MainApp sp={sp} context={context} />
       </section>
     );
   }
