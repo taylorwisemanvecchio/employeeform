@@ -5,11 +5,12 @@ import type { IEmployeeEvakProps } from "./IEmployeeEvakProps";
 
 interface ISupervisorDashboardProps {
   sp: IEmployeeEvakProps["sp"];
+  context: IEmployeeEvakProps["context"];
 }
 
 export default function SupervisorDashboard(props: ISupervisorDashboardProps): React.ReactElement {
-  const { sp } = props;
-  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp), [sp]);
+  const { sp, context } = props;
+  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp, context), [sp, context]);
 
   const [assignments, setAssignments] = React.useState<IAssignment[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);

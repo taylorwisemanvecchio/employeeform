@@ -42,7 +42,8 @@ export default class EmployeeEvakWebPart extends BaseClientSideWebPart<IEmployee
         userDisplayName: this.context.pageContext.user.displayName,
 
         // ⭐ NEW — pass the SPFI client to React component
-        sp: this.sp
+        sp: this.sp,
+        context: this.context
       }
     );
 

@@ -2,21 +2,12 @@ import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { EvaluationService, IAssignment } from "../services/EvaluationService";
 import styles from "./EmployeeEvak.module.scss";
-import {
-  Dialog,
-  DialogType,
-  DialogFooter,
-  PrimaryButton,
-  DefaultButton,
-  TextField,
-  Checkbox
-} from "@fluentui/react";
 
-interface IAdminDashboardProps {
+interface IManagerDashboardProps {
   service: EvaluationService;
 }
 
-interface IAdminRow {
+interface IManagerRow {
   id: number;
   title: string;
   status: string;
@@ -32,29 +23,13 @@ interface IAdminRow {
   proposedReviewerSubmitted: boolean;
 }
 
-export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
+export const ManagerDashboard: React.FC<IManagerDashboardProps> = ({ service }) => {
   const [assignments, setAssignments] = useState<IAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [submissionFilter, setSubmissionFilter] = useState<string>("All");
-  const [sendingReminders, setSendingReminders] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [showWebhookInput, setShowWebhookInput] = useState(false);
-  const [sendingGoLive, setSendingGoLive] = useState(false);
-  const [goLiveWebhookUrl, setGoLiveWebhookUrl] = useState("");
-  const [showGoLiveWebhookInput, setShowGoLiveWebhookInput] = useState(false);
-
-  // Rejection dialog state
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<IAssignment | undefined>();
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [rejectEmployee, setRejectEmployee] = useState(false);
-  const [rejectSupervisor, setRejectSupervisor] = useState(false);
-  const [rejectReviewer, setRejectReviewer] = useState(false);
-  const [sendingRejection, setSendingRejection] = useState(false);
-  const rejectionWebhookUrl = "https://defaultdbf39b203d1a468094f8b0aade3398.82.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/35615e9615d745828af325e55871ab7b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=65ifFfq4dvZMXpSv06DXM9Z3cYUfWWulFRwvLCTRViA";
 
   // Refs for sticky scrollbar synchronization
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
@@ -65,7 +40,7 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
     try {
       setLoading(true);
       setError(undefined);
-      const data = await service.getAllAssignments();
+      const data = await service.getAssignmentsForDepartmentManager();
       setAssignments(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load assignments";
@@ -81,8 +56,8 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
     });
   }, [loadAssignments]);
 
-  // Transform assignments into admin rows
-  const adminRows: IAdminRow[] = useMemo(() => {
+  // Transform assignments into manager rows
+  const managerRows: IManagerRow[] = useMemo(() => {
     return assignments.map(a => {
       const proposedReviewerAdded =
         a.ProposedReviewer && a.OptionalReviewer &&
@@ -108,7 +83,7 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
 
   // Filter rows based on search and filters
   const filteredRows = useMemo(() => {
-    return adminRows.filter(row => {
+    return managerRows.filter(row => {
       // Search filter - ES5 compatible
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
@@ -136,66 +111,7 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
 
       return true;
     });
-  }, [adminRows, searchTerm, statusFilter, submissionFilter]);
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const total = adminRows.length;
-    const inProgress = adminRows.filter(r => r.status === "In Progress").length;
-    const completed = adminRows.filter(r =>
-      r.employeeSubmitted && r.supervisorSubmitted &&
-      (!r.proposedReviewerAdded || r.proposedReviewerSubmitted)
-    ).length;
-    const employeeCompleted = adminRows.filter(r => r.employeeSubmitted).length;
-    const supervisorCompleted = adminRows.filter(r => r.supervisorSubmitted).length;
-    const reviewerCompleted = adminRows.filter(r =>
-      r.proposedReviewerAdded && r.proposedReviewerSubmitted
-    ).length;
-    const reviewerPending = adminRows.filter(r =>
-      r.proposedReviewerAdded && !r.proposedReviewerSubmitted
-    ).length;
-
-    return {
-      total,
-      inProgress,
-      completed,
-      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-      employeeCompleted,
-      employeeRate: total > 0 ? Math.round((employeeCompleted / total) * 100) : 0,
-      supervisorCompleted,
-      supervisorRate: total > 0 ? Math.round((supervisorCompleted / total) * 100) : 0,
-      reviewerCompleted,
-      reviewerPending,
-      reviewerRate: reviewerPending + reviewerCompleted > 0
-        ? Math.round((reviewerCompleted / (reviewerPending + reviewerCompleted)) * 100)
-        : 0
-    };
-  }, [adminRows]);
-
-  // Get unique status values for filter dropdown - ES5 compatible
-  const uniqueStatuses = useMemo(() => {
-    const statusMap: { [key: string]: boolean } = {};
-    adminRows.forEach(r => {
-      statusMap[r.status] = true;
-    });
-    const statuses: string[] = [];
-    for (const status in statusMap) {
-      if (Object.prototype.hasOwnProperty.call(statusMap, status)) {
-        statuses.push(status);
-      }
-    }
-    return statuses.sort();
-  }, [adminRows]);
-
-  // Get incomplete assignments for reminders
-  const incompleteAssignments = useMemo(() => {
-    return assignments.filter(a =>
-      !a.SelfEvalSubmitted ||
-      !a.SupervisorSubmitted ||
-      (a.ProposedReviewer && a.OptionalReviewer &&
-       a.ProposedReviewer.Id === a.OptionalReviewer.Id && !a.ReviewerSubmitted)
-    );
-  }, [assignments]);
+  }, [managerRows, searchTerm, statusFilter, submissionFilter]);
 
   // Sync sticky scrollbar with table container
   useEffect(() => {
@@ -241,111 +157,57 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
     };
   }, [filteredRows]); // Re-run when data changes
 
-  const handleSendReminders = async (): Promise<void> => {
-    if (!webhookUrl) {
-      setShowWebhookInput(true);
-      return;
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const total = managerRows.length;
+    const inProgress = managerRows.filter(r => r.status === "In Progress").length;
+    const completed = managerRows.filter(r =>
+      r.employeeSubmitted && r.supervisorSubmitted &&
+      (!r.proposedReviewerAdded || r.proposedReviewerSubmitted)
+    ).length;
+    const employeeCompleted = managerRows.filter(r => r.employeeSubmitted).length;
+    const supervisorCompleted = managerRows.filter(r => r.supervisorSubmitted).length;
+    const reviewerCompleted = managerRows.filter(r =>
+      r.proposedReviewerAdded && r.proposedReviewerSubmitted
+    ).length;
+    const reviewerPending = managerRows.filter(r =>
+      r.proposedReviewerAdded && !r.proposedReviewerSubmitted
+    ).length;
+
+    return {
+      total,
+      inProgress,
+      completed,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      employeeCompleted,
+      employeeRate: total > 0 ? Math.round((employeeCompleted / total) * 100) : 0,
+      supervisorCompleted,
+      supervisorRate: total > 0 ? Math.round((supervisorCompleted / total) * 100) : 0,
+      reviewerCompleted,
+      reviewerPending,
+      reviewerRate: reviewerPending + reviewerCompleted > 0
+        ? Math.round((reviewerCompleted / (reviewerPending + reviewerCompleted)) * 100)
+        : 0
+    };
+  }, [managerRows]);
+
+  // Get unique status values for filter dropdown - ES5 compatible
+  const uniqueStatuses = useMemo(() => {
+    const statusMap: { [key: string]: boolean } = {};
+    managerRows.forEach(r => {
+      statusMap[r.status] = true;
+    });
+    const statuses: string[] = [];
+    for (const status in statusMap) {
+      if (Object.prototype.hasOwnProperty.call(statusMap, status)) {
+        statuses.push(status);
+      }
     }
-
-    try {
-      setSendingReminders(true);
-      await service.sendReminders(webhookUrl, incompleteAssignments);
-      alert(`Reminders sent successfully to ${incompleteAssignments.length} incomplete evaluations!`);
-      setShowWebhookInput(false);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send reminders";
-      alert(`Error sending reminders: ${errorMessage}`);
-    } finally {
-      setSendingReminders(false);
-    }
-  };
-
-  const handleSendGoLive = async (): Promise<void> => {
-    if (!goLiveWebhookUrl) {
-      setShowGoLiveWebhookInput(true);
-      return;
-    }
-
-    try {
-      setSendingGoLive(true);
-      await service.sendGoLive(goLiveWebhookUrl, incompleteAssignments);
-      alert(`Go Live sent successfully to ${incompleteAssignments.length} incomplete evaluations!`);
-      setShowGoLiveWebhookInput(false);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send go live";
-      alert(`Error sending go live: ${errorMessage}`);
-    } finally {
-      setSendingGoLive(false);
-    }
-  };
-
-  const handleOpenRejectDialog = (assignment: IAssignment): void => {
-    setSelectedAssignment(assignment);
-    setRejectionReason("");
-    setRejectEmployee(false);
-    setRejectSupervisor(false);
-    setRejectReviewer(false);
-    setShowRejectDialog(true);
-  };
-
-  const handleCloseRejectDialog = (): void => {
-    setShowRejectDialog(false);
-    setSelectedAssignment(undefined);
-    setRejectionReason("");
-    setRejectEmployee(false);
-    setRejectSupervisor(false);
-    setRejectReviewer(false);
-  };
-
-  const handleSendRejection = async (): Promise<void> => {
-    if (!selectedAssignment) return;
-
-    if (!rejectionReason.trim()) {
-      alert("Please provide a reason for rejection");
-      return;
-    }
-
-    if (!rejectEmployee && !rejectSupervisor && !rejectReviewer) {
-      alert("Please select at least one submitter to reject");
-      return;
-    }
-
-    try {
-      setSendingRejection(true);
-
-      // Send rejection webhook to Power Automate
-      await service.sendRejection(
-        rejectionWebhookUrl,
-        selectedAssignment,
-        rejectionReason,
-        rejectEmployee,
-        rejectSupervisor,
-        rejectReviewer
-      );
-
-      // Update submission flags and status in SharePoint
-      await service.updateRejectedSubmissions(
-        selectedAssignment.Id,
-        rejectEmployee,
-        rejectSupervisor,
-        rejectReviewer
-      );
-
-      alert("Rejection sent successfully!");
-      handleCloseRejectDialog();
-
-      // Reload assignments to reflect the changes
-      await loadAssignments();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send rejection";
-      alert(`Error sending rejection: ${errorMessage}`);
-    } finally {
-      setSendingRejection(false);
-    }
-  };
+    return statuses.sort();
+  }, [managerRows]);
 
   if (loading) {
-    return <div className={styles.container}>Loading admin dashboard...</div>;
+    return <div className={styles.container}>Loading manager dashboard...</div>;
   }
 
   if (error) {
@@ -361,7 +223,7 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
 
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Admin Dashboard - Evaluation Progress</h2>
+      <h2 className={styles.title}>Manager Dashboard - Department Evaluation Progress</h2>
 
       {/* Statistics Cards */}
       <div className={styles.statsGrid}>
@@ -450,62 +312,6 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
         )}
       </div>
 
-      {/* Send Reminders Section */}
-      <div className={styles.reminderSection}>
-        <button
-          onClick={handleSendReminders}
-          disabled={sendingReminders || incompleteAssignments.length === 0}
-          className={styles.reminderButton}
-        >
-          {sendingReminders ? "Sending..." : `Send Reminders (${incompleteAssignments.length} incomplete)`}
-        </button>
-        {showWebhookInput && (
-          <div className={styles.webhookInput}>
-            <input
-              type="text"
-              placeholder="Enter Power Automate webhook URL"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              className={styles.input}
-            />
-            <button onClick={handleSendReminders} className={styles.button}>
-              Send
-            </button>
-            <button onClick={() => setShowWebhookInput(false)} className={styles.buttonSecondary}>
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Go Live Section */}
-      <div className={styles.reminderSection}>
-        <button
-          onClick={handleSendGoLive}
-          disabled={sendingGoLive || incompleteAssignments.length === 0}
-          className={styles.reminderButton}
-        >
-          {sendingGoLive ? "Sending..." : `Go Live (${incompleteAssignments.length} incomplete)`}
-        </button>
-        {showGoLiveWebhookInput && (
-          <div className={styles.webhookInput}>
-            <input
-              type="text"
-              placeholder="Enter Power Automate webhook URL for Go Live"
-              value={goLiveWebhookUrl}
-              onChange={(e) => setGoLiveWebhookUrl(e.target.value)}
-              className={styles.input}
-            />
-            <button onClick={handleSendGoLive} className={styles.button}>
-              Send
-            </button>
-            <button onClick={() => setShowGoLiveWebhookInput(false)} className={styles.buttonSecondary}>
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Search and Filters */}
       <div className={styles.filterSection}>
         <input
@@ -538,7 +344,7 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
 
       {/* Results Count */}
       <div className={styles.resultsCount}>
-        Showing {filteredRows.length} of {adminRows.length} evaluations
+        Showing {filteredRows.length} of {managerRows.length} evaluations
       </div>
 
       {/* Sticky Horizontal Scrollbar */}
@@ -572,26 +378,17 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
               <th>Proposed Reviewer</th>
               <th>Reviewer Added</th>
               <th>Reviewer Submitted</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={10} className={styles.noResults}>
+                <td colSpan={9} className={styles.noResults}>
                   No evaluations found matching your criteria
                 </td>
               </tr>
             ) : (
               filteredRows.map(row => {
-                // ES5-compatible find alternative
-                let assignment: IAssignment | undefined;
-                for (let i = 0; i < assignments.length; i++) {
-                  if (assignments[i].Id === row.id) {
-                    assignment = assignments[i];
-                    break;
-                  }
-                }
                 return (
                   <tr key={row.id}>
                     <td>{row.title}</td>
@@ -635,23 +432,6 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
                         readOnly
                       />
                     </td>
-                    <td>
-                      <button
-                        onClick={() => assignment && handleOpenRejectDialog(assignment)}
-                        className={styles.button}
-                        disabled={!assignment}
-                        style={{
-                          backgroundColor: '#d13438',
-                          color: 'white',
-                          border: 'none',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          cursor: assignment ? 'pointer' : 'not-allowed'
-                        }}
-                      >
-                        Reject
-                      </button>
-                    </td>
                   </tr>
                 );
               })
@@ -659,73 +439,6 @@ export const AdminDashboard: React.FC<IAdminDashboardProps> = ({ service }) => {
           </tbody>
         </table>
       </div>
-
-      {/* Rejection Dialog */}
-      <Dialog
-        hidden={!showRejectDialog}
-        onDismiss={handleCloseRejectDialog}
-        dialogContentProps={{
-          type: DialogType.normal,
-          title: 'Reject Evaluation',
-          subText: selectedAssignment ? `Assignment: ${selectedAssignment.Title}` : ''
-        }}
-        modalProps={{
-          isBlocking: true
-        }}
-      >
-        <TextField
-          label="Reason for Rejection"
-          multiline
-          rows={4}
-          required
-          value={rejectionReason}
-          onChange={(_, newValue) => setRejectionReason(newValue || "")}
-          placeholder="Please provide a detailed reason for the rejection..."
-        />
-
-        <div style={{ marginTop: 16 }}>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: 8 }}>
-            Select submitters to reject:
-          </label>
-          {selectedAssignment?.Employee && (
-            <Checkbox
-              label={`Employee: ${selectedAssignment.Employee.Title || selectedAssignment.Employee.Email}`}
-              checked={rejectEmployee}
-              onChange={(_, checked) => setRejectEmployee(checked || false)}
-              disabled={!selectedAssignment.SelfEvalSubmitted}
-            />
-          )}
-          {selectedAssignment?.Supervisor && (
-            <Checkbox
-              label={`Supervisor: ${selectedAssignment.Supervisor.Title || selectedAssignment.Supervisor.Email}`}
-              checked={rejectSupervisor}
-              onChange={(_, checked) => setRejectSupervisor(checked || false)}
-              disabled={!selectedAssignment.SupervisorSubmitted}
-            />
-          )}
-          {selectedAssignment?.OptionalReviewer && (
-            <Checkbox
-              label={`Reviewer: ${selectedAssignment.OptionalReviewer.Title || selectedAssignment.OptionalReviewer.Email}`}
-              checked={rejectReviewer}
-              onChange={(_, checked) => setRejectReviewer(checked || false)}
-              disabled={!selectedAssignment.ReviewerSubmitted}
-            />
-          )}
-        </div>
-
-        <DialogFooter>
-          <PrimaryButton
-            onClick={handleSendRejection}
-            text="Send Rejection"
-            disabled={sendingRejection}
-          />
-          <DefaultButton
-            onClick={handleCloseRejectDialog}
-            text="Cancel"
-            disabled={sendingRejection}
-          />
-        </DialogFooter>
-      </Dialog>
     </div>
   );
 };

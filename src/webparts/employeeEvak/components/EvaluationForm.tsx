@@ -8,6 +8,7 @@ import {
   Stack
 } from "@fluentui/react";
 import { SPFI } from "@pnp/sp";
+import { WebPartContext } from "@microsoft/sp-webpart-base";
 
 import {
   EvaluationService,
@@ -38,8 +39,9 @@ export const EvaluationForm: React.FC<{
   sp: SPFI;
   assignmentId: number;
   reviewerType: string;
-}> = ({ sp, assignmentId, reviewerType }) => {
-  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp), [sp]);
+  context?: WebPartContext;
+}> = ({ sp, assignmentId, reviewerType, context }) => {
+  const svc = React.useMemo((): EvaluationService => new EvaluationService(sp, context), [sp, context]);
 
   const [response, setResponse] =
     React.useState<IEvaluationResponse | undefined>(undefined);
